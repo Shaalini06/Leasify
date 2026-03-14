@@ -19,6 +19,43 @@ class SLAFields(BaseModel):
     vin: str = Field(default="")
 
 
+class SignupRequest(BaseModel):
+    """Input payload for user registration."""
+
+    email: str = Field(..., min_length=3)
+    password: str = Field(..., min_length=8)
+    full_name: str = Field(..., min_length=1)
+
+
+class LoginRequest(BaseModel):
+    """Input payload for user login."""
+
+    email: str = Field(..., min_length=3)
+    password: str = Field(..., min_length=1)
+
+
+class AuthUser(BaseModel):
+    """Safe user shape returned to the frontend."""
+
+    id: int
+    email: str
+    full_name: str
+
+
+class AuthResponse(BaseModel):
+    """Authentication response containing a token and current user."""
+
+    token: str
+    user: AuthUser
+
+
+class VerifyTokenResponse(BaseModel):
+    """Response payload for explicit token verification endpoint."""
+
+    valid: bool
+    user: AuthUser
+
+
 class UploadContractResponse(BaseModel):
     """Response schema returned after OCR upload processing."""
 

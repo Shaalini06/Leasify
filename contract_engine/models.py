@@ -34,3 +34,15 @@ class SLAExtraction(Base):
 
     # Back-reference to the source contract document.
     document = relationship("ContractDocument", back_populates="sla_result")
+
+
+class UserAccount(Base):
+    """Stores basic user credentials for frontend authentication flows."""
+
+    __tablename__ = "user_accounts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    full_name = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=False, unique=True, index=True)
+    password_hash = Column(String(512), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

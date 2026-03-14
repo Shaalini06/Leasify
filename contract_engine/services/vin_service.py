@@ -38,11 +38,27 @@ def get_vehicle_details(vin: str) -> Dict[str, Any]:
 
     item = results[0]
 
+    # NHTSA may return structured decode warnings/errors even when HTTP is 200.
+    # Treat non-zero-only error codes as lookup failures.
+    raw_error_code = str(item.get("ErrorCode", "") or "")
+    error_codes = [code.strip() for code in raw_error_code.split(",") if code.strip()]
+    has_decode_error = bool(error_codes) and "0" not in error_codes
+    error_text = str(item.get("ErrorText", "") or "").strip()
+
+    make = item.get("Make", "") or ""
+    model = item.get("Model", "") or ""
+    model_year = item.get("ModelYear", "") or ""
+
+    if not any([make.strip(), model.strip(), model_year.strip()]):
+        if has_decode_error:
+            raise ValueError(error_text or "NHTSA could not decode this VIN.")
+        raise ValueError("No vehicle details found for this VIN.")
+
     # Extract only required fields to keep response clean and predictable.
     return {
         "vin": clean_vin,
-        "make": item.get("Make", "") or "",
-        "model": item.get("Model", "") or "",
-        "model_year": item.get("ModelYear", "") or "",
+        "make": make,
+        "model": model,
+        "model_year": model_year,
         "recalls": item.get("Recalls") if item.get("Recalls") else None,
     }

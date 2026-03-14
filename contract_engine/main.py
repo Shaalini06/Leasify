@@ -5,9 +5,10 @@ import logging
 
 import uvicorn
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from database import Base, engine
-from routers import extraction, upload, vehicle
+from routers import analysis, auth, chat, extraction, upload, vehicle
 
 # Configure app-wide logging so errors are visible in console and deployment logs.
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -23,6 +24,15 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# Allow the React dev server (and any local origin) to call the API.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.get("/")
 async def health_check():
@@ -34,6 +44,9 @@ async def health_check():
 app.include_router(upload.router)
 app.include_router(extraction.router)
 app.include_router(vehicle.router)
+app.include_router(analysis.router)
+app.include_router(chat.router)
+app.include_router(auth.router)
 
 
 def run_server() -> None:
