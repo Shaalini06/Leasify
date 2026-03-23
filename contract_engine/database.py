@@ -4,6 +4,8 @@ import os
 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
+from sqlalchemy import inspect as sqlalchemy_inspect
+from sqlalchemy import text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 # Load environment variables from a local .env file.
@@ -37,3 +39,38 @@ def get_db():
     finally:
         # Always close the session to release DB resources.
         db.close()
+
+
+# SQLite development can easily end up with a stale schema when the app evolves.
+# This app uses `Base.metadata.create_all()` without migrations, so we ensure
+# analysis-related columns exist before endpoints query the table.
+def ensure_analysis_reports_schema() -> None:
+    """Best-effort schema compatibility for `analysis_reports` on SQLite."""
+    # Only SQLite supports the PRAGMA + ALTER TABLE flow used here.
+    if getattr(engine.dialect, "name", "").lower() != "sqlite":
+        return
+
+    # Fast path: if table doesn't exist yet, `create_all()` will handle it.
+    insp = sqlalchemy_inspect(engine)
+    if not insp.has_table("analysis_reports"):
+        return
+
+    with engine.connect() as conn:
+        rows = conn.execute(text("PRAGMA table_info(analysis_reports)")).fetchall()
+
+    existing_columns = {row[1] for row in rows if len(row) > 1}
+
+    required = {
+        "user_id": "INTEGER",
+        "contract_text": "TEXT",
+        "pdf_path": "VARCHAR(512)",
+        "fairness_score": "FLOAT",
+    }
+
+    missing = [name for name in required.keys() if name not in existing_columns]
+    if not missing:
+        return
+
+    with engine.begin() as conn:
+        for name in missing:
+            conn.execute(text(f"ALTER TABLE analysis_reports ADD COLUMN {name} {required[name]}"))

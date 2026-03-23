@@ -1,14 +1,37 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import {
+  Chart as ChartJS,
+  ArcElement,
+  BarElement,
+  CategoryScale,
+  Legend,
+  LineElement,
+  LinearScale,
+  PointElement,
+  RadialLinearScale,
+  Tooltip,
+} from "chart.js";
+import { Bar, Doughnut, Radar } from "react-chartjs-2";
 import Navbar from "../components/Navbar";
 import GlassCard from "../components/GlassCard";
-import Input from "../components/Input";
 import Button from "../components/Button";
 import { Spinner } from "../components/LoadingSpinner";
 import Alert from "../components/Alert";
-import { analyzeContract, extractSLA, lookupVIN } from "../services/api";
-import { Download, RefreshCw, Search } from "react-feather";
+import { analyzeContract, extractSLA, getUserContracts, downloadPDFReport } from "../services/api";
+import { RefreshCw, Download } from "react-feather";
 
+ChartJS.register(
+  ArcElement,
+  BarElement,
+  CategoryScale,
+  Legend,
+  LineElement,
+  LinearScale,
+  PointElement,
+  RadialLinearScale,
+  Tooltip,
+);
 
 function extractNumeric(value) {
   if (value === null || value === undefined) return null;
@@ -16,7 +39,6 @@ function extractNumeric(value) {
   const match = text.match(/-?\d+(?:\.\d+)?/);
   return match ? Number(match[0]) : null;
 }
-
 
 function formatPercent(value) {
   if (value === null || value === undefined || String(value).trim() === "") {
@@ -26,49 +48,68 @@ function formatPercent(value) {
   return text.includes("%") ? text : `${text}%`;
 }
 
-
 function formatMoney(value) {
   if (value === null || value === undefined || String(value).trim() === "") {
     return "$N/A";
   }
   const parsed = extractNumeric(value);
-  if (parsed === null) {
-    return String(value).startsWith("$") ? String(value) : `$${value}`;
-  }
+  if (parsed === null) return String(value).startsWith("$") ? String(value) : `$${value}`;
   return `$${parsed.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 }
 
-
 function formatLoanTerm(value) {
-  if (value === null || value === undefined || String(value).trim() === "") {
-    return "N/A";
-  }
+  if (value === null || value === undefined || String(value).trim() === "") return "N/A";
   const text = String(value).trim();
   return /month|mo/i.test(text) ? text : `${text} months`;
 }
 
+function categoryClass(category) {
+  const key = String(category || "").toLowerCase();
+  if (key === "good") return "bg-green-500/15 text-green-300 border-green-500/40";
+  if (key === "mid") return "bg-yellow-500/15 text-yellow-300 border-yellow-500/40";
+  return "bg-red-500/15 text-red-300 border-red-500/40";
+}
 
-function issueSeverity(issue, fallbackRiskLevel) {
-  const text = String(issue || "").toLowerCase();
-  if (
-    text.includes("high") ||
-    text.includes("overpriced") ||
-    text.includes("risky")
-  ) {
-    return "high";
+function riskClass(level) {
+  const normalized = String(level || "").toLowerCase();
+  if (normalized === "low") return "bg-green-500/10 text-green-400 border-green-500/30";
+  if (normalized === "medium") return "bg-yellow-500/10 text-yellow-300 border-yellow-500/30";
+  return "bg-red-500/10 text-red-400 border-red-500/30";
+}
+
+function toFiniteNumber(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function toDisplayText(item) {
+  if (item === null || item === undefined) return "";
+  if (typeof item === "string") return item;
+  if (typeof item === "number" || typeof item === "boolean") return String(item);
+  if (Array.isArray(item)) {
+    return item
+      .map((entry) => toDisplayText(entry))
+      .filter(Boolean)
+      .join(" ");
   }
-  if (
-    text.includes("long") ||
-    text.includes("duration") ||
-    text.includes("monthly")
-  ) {
-    return "medium";
+  if (typeof item === "object") {
+    const preferredKeys = ["message", "detail", "issue", "text", "label", "title", "description"];
+    for (const key of preferredKeys) {
+      const value = item[key];
+      if (typeof value === "string" && value.trim()) return value;
+    }
+
+    const values = Object.values(item)
+      .map((value) => toDisplayText(value))
+      .filter(Boolean);
+    if (values.length > 0) return values.join(" | ");
   }
 
-  const normalized = String(fallbackRiskLevel || "").toLowerCase();
-  if (normalized === "high") return "high";
-  if (normalized === "medium") return "medium";
-  return "low";
+  return "";
 }
 
 export default function AnalysisPage() {
@@ -76,21 +117,24 @@ export default function AnalysisPage() {
   const navigate = useNavigate();
   const [analysis, setAnalysis] = useState(null);
   const [sla, setSla] = useState(null);
-  const [activeTab, setActiveTab] = useState("sla-vin");
-  const [vinInput, setVinInput] = useState("");
-  const [vinResult, setVinResult] = useState(null);
   const [loading, setLoading] = useState(true);
   const [extracting, setExtracting] = useState(false);
-  const [lookingUpVin, setLookingUpVin] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
 
-  const documentId =
-    new URLSearchParams(location.search).get("id") ||
-    sessionStorage.getItem("document_id");
+  const [documentId, setDocumentId] = useState(
+    new URLSearchParams(location.search).get("id") || sessionStorage.getItem("document_id") || "",
+  );
 
-  const runExtractionAndAnalysis = async (showSuccessMessage = true) => {
-    if (!documentId) {
+  const handleDownloadPDF = () => {
+    if (!documentId) return;
+    downloadPDFReport(documentId, `contract_${documentId}`);
+  };
+
+  const runExtractionAndAnalysis = async (showSuccessMessage = true, targetDocumentId = null) => {
+    const activeDocumentId = String(targetDocumentId || documentId || "");
+
+    if (!activeDocumentId) {
       setError("No contract selected. Please upload a contract first.");
       return;
     }
@@ -100,111 +144,58 @@ export default function AnalysisPage() {
     setInfo("");
 
     try {
-      const slaResponse = await extractSLA(documentId);
-      const extractedSla = slaResponse?.sla_data || null;
-      setSla(extractedSla);
+      const slaResponse = await extractSLA(activeDocumentId);
+      setSla(slaResponse?.sla_data || null);
 
-      if (extractedSla?.vin) {
-        setVinInput(String(extractedSla.vin));
-      }
-
-      let analysisWarning = "";
-      try {
-        const analysisResponse = await analyzeContract(documentId);
-        setAnalysis(analysisResponse);
-      } catch (analysisError) {
-        setAnalysis(null);
-        analysisWarning =
-          analysisError?.response?.data?.detail ||
-          "SLA extracted, but risk analysis could not be completed yet.";
-      }
+      const analysisResponse = await analyzeContract(activeDocumentId);
+      setAnalysis(analysisResponse);
 
       if (showSuccessMessage) {
-        setActiveTab("analysis");
-        setInfo(
-          analysisWarning
-            ? `SLA extracted successfully. ${analysisWarning}`
-            : "SLA extracted and risk analysis refreshed.",
-        );
-      } else if (analysisWarning) {
-        setInfo(analysisWarning);
+        setInfo("SLA extraction and detailed scoring report refreshed.");
       }
     } catch (err) {
-      setError(
-        err?.response?.data?.detail ||
-          "Failed to extract SLA data. Please try again.",
-      );
+      setError(err?.response?.data?.detail || "Failed to extract/analyze this contract.");
     } finally {
       setExtracting(false);
     }
   };
 
   useEffect(() => {
-    if (!documentId) {
-      setError("No contract selected. Please upload a contract first.");
-      setLoading(false);
-      return;
-    }
-
     const bootstrap = async () => {
-      await runExtractionAndAnalysis(false);
+      let bootstrapDocumentId = documentId;
+
+      if (!documentId) {
+        try {
+          const contractsResponse = await getUserContracts();
+          const contracts = Array.isArray(contractsResponse?.contracts)
+            ? contractsResponse.contracts
+            : [];
+
+          const fallbackContract = contracts.find((item) => item.analyzed) || contracts[0];
+
+          if (!fallbackContract?.document_id) {
+            setError("No contract selected. Please upload a contract first.");
+            setLoading(false);
+            return;
+          }
+
+          const fallbackId = String(fallbackContract.document_id);
+          sessionStorage.setItem("document_id", fallbackId);
+          setDocumentId(fallbackId);
+          bootstrapDocumentId = fallbackId;
+        } catch (contractsError) {
+          setError("Failed to load a contract for analysis. Please try again.");
+          setLoading(false);
+          return;
+        }
+      }
+
+      await runExtractionAndAnalysis(false, bootstrapDocumentId);
       setLoading(false);
     };
 
     bootstrap();
   }, [documentId]);
-
-  const handleLookupVin = async (event) => {
-    event.preventDefault();
-    const cleanVin = String(vinInput || "").trim().toUpperCase();
-    setInfo("");
-
-    if (!cleanVin) {
-      setError("Enter a VIN to check with the NHTSA database.");
-      return;
-    }
-
-    setLookingUpVin(true);
-    setError("");
-
-    try {
-      const vinData = await lookupVIN(cleanVin);
-      setVinResult(vinData);
-      const makeModel = [vinData?.make, vinData?.model].filter(Boolean).join(" ");
-      const year = vinData?.model_year ? ` (${vinData.model_year})` : "";
-      setInfo(
-        makeModel
-          ? `NHTSA lookup success: ${makeModel}${year}`
-          : "VIN lookup completed using NHTSA data.",
-      );
-    } catch (err) {
-      setVinResult(null);
-      setError(
-        err?.response?.data?.detail ||
-          "VIN lookup failed. Please verify the VIN and try again.",
-      );
-    } finally {
-      setLookingUpVin(false);
-    }
-  };
-
-  const handleDownloadReport = async () => {
-    // TODO: Implement PDF download
-    alert("PDF download coming soon!");
-  };
-
-  const riskLevel = analysis?.risk_level || "Unknown";
-  const issues = Array.isArray(analysis?.issues) ? analysis.issues : [];
-  const suggestions =
-    Array.isArray(analysis?.negotiation_suggestions) &&
-    analysis.negotiation_suggestions.length > 0
-      ? analysis.negotiation_suggestions
-      : [
-          "Run SLA extraction to generate personalized negotiation suggestions.",
-        ];
-
-  const effectiveVehicle = vinResult || {};
-  const marketVehicle = analysis?.vehicle_market_data || {};
 
   if (loading) {
     return (
@@ -217,62 +208,109 @@ export default function AnalysisPage() {
     );
   }
 
+  const hasAnalysis = Boolean(analysis);
+  const hasSla = Boolean(sla);
+
+  const issues = (Array.isArray(analysis?.issues) ? analysis.issues : [])
+    .map((item) => toDisplayText(item))
+    .filter(Boolean);
+  const suggestions = (Array.isArray(analysis?.negotiation_suggestions)
+    ? analysis.negotiation_suggestions
+    : [])
+    .map((item) => toDisplayText(item))
+    .filter(Boolean);
+  const scoreBreakdown = analysis?.score_breakdown || {};
+  const breakdownItems = Object.values(scoreBreakdown)
+    .filter((item) => item && typeof item === "object")
+    .map((item, index) => ({
+      label: String(item.label || `Section ${index + 1}`),
+      score: clamp(toFiniteNumber(item.score, 0), 0, 100),
+    }));
+  const completeness = analysis?.sla_completeness || { present_fields: 0, total_fields: 8, completion_percent: 0 };
+  const dealScore = clamp(toFiniteNumber(analysis?.deal_score, 0), 0, 100);
+  const dealCategory = String(analysis?.deal_category || "bad");
+
+  const radarData = {
+    labels: breakdownItems.map((item) => item.label),
+    datasets: [
+      {
+        label: "Score Segment",
+        data: breakdownItems.map((item) => item.score),
+        backgroundColor: "rgba(220,38,38,0.15)",
+        borderColor: "rgba(248,113,113,0.95)",
+        pointBackgroundColor: "rgba(248,113,113,1)",
+      },
+    ],
+  };
+
+  const barData = {
+    labels: ["APR", "Loan Term", "Monthly Payment", "Total Payment"],
+    datasets: [
+      {
+        label: "Extracted SLA Values",
+        data: [
+          extractNumeric(sla?.apr) || 0,
+          extractNumeric(sla?.loan_term) || 0,
+          extractNumeric(sla?.monthly_payment) || 0,
+          extractNumeric(sla?.total_payment) || 0,
+        ],
+        backgroundColor: [
+          "rgba(220,38,38,0.7)",
+          "rgba(20,184,166,0.7)",
+          "rgba(245,158,11,0.7)",
+          "rgba(34,197,94,0.7)",
+        ],
+      },
+    ],
+  };
+
+  const doughnutData = {
+    labels: ["Deal Score", "Gap to Perfect"],
+    datasets: [
+      {
+        data: [dealScore, Math.max(0, 100 - dealScore)],
+        backgroundColor: dealCategory === "good"
+          ? ["rgba(34,197,94,0.85)", "rgba(34,197,94,0.15)"]
+          : dealCategory === "mid"
+            ? ["rgba(250,204,21,0.85)", "rgba(250,204,21,0.15)"]
+            : ["rgba(239,68,68,0.85)", "rgba(239,68,68,0.15)"],
+        borderWidth: 0,
+      },
+    ],
+  };
+
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-bg-primary via-bg-secondary to-bg-tertiary">
       <Navbar />
-
-      <main className="flex-1 ml-72 p-8 overflow-y-auto max-h-screen">
-        <div className="max-w-6xl mx-auto">
-          {/* Header */}
+      <main className="main-content flex-1 ml-72 p-8 overflow-y-auto max-h-screen">
+        <div className="max-w-7xl mx-auto">
           <div className="mb-8 flex items-center justify-between animate-fade-in">
             <div>
-              <h1 className="text-4xl font-bold text-text-primary mb-2">
-                Contract Analysis
-              </h1>
-              <p className="text-text-secondary">
-                Detailed breakdown of lease terms and SLA data
-              </p>
+              <h1 className="text-4xl font-bold text-text-primary mb-2">Detailed SLA Analysis</h1>
+              <p className="text-text-secondary">Score-wise report with risk findings and visual insights.</p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex items-center gap-3 flex-wrap justify-end">
+              <Button
+                variant="secondary"
+                className="flex items-center gap-2"
+                onClick={handleDownloadPDF}
+                disabled={!documentId || extracting}
+              >
+                <Download size={16} />
+                Download PDF Report
+              </Button>
               <Button
                 variant="primary"
-                size="md"
                 className="flex items-center gap-2"
-                onClick={handleDownloadReport}
+                onClick={() => runExtractionAndAnalysis(true)}
+                disabled={!documentId || extracting}
+                loading={extracting}
               >
-                <Download size={18} />
-                Download PDF
+                <RefreshCw size={16} />
+                Re-Run Extraction
               </Button>
             </div>
           </div>
-
-          {/* Action Sections */}
-          <GlassCard className="p-2 mb-6 animate-fade-in">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setActiveTab("sla-vin")}
-                className={`rounded-lg px-4 py-3 text-sm font-semibold transition-colors ${
-                  activeTab === "sla-vin"
-                    ? "bg-accent-blue text-white"
-                    : "bg-white/5 text-text-secondary hover:bg-white/10"
-                }`}
-              >
-                SLA & VIN
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("analysis")}
-                className={`rounded-lg px-4 py-3 text-sm font-semibold transition-colors ${
-                  activeTab === "analysis"
-                    ? "bg-accent-blue text-white"
-                    : "bg-white/5 text-text-secondary hover:bg-white/10"
-                }`}
-              >
-                Analysis Output
-              </button>
-            </div>
-          </GlassCard>
 
           {error && (
             <Alert
@@ -283,7 +321,6 @@ export default function AnalysisPage() {
               className="mb-6"
             />
           )}
-
           {info && (
             <Alert
               type="success"
@@ -294,247 +331,170 @@ export default function AnalysisPage() {
             />
           )}
 
-          {activeTab === "sla-vin" && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-              <GlassCard className="p-6 animate-slide-up">
-                <h3 className="text-lg font-semibold text-text-primary mb-2">
-                  SLA Extraction
-                </h3>
-                <p className="text-text-secondary text-sm mb-4">
-                  Extract SLA details from the uploaded contract to populate APR,
-                  loan term, payment details, and VIN.
+          {(analysis?.verdict || analysis?.summary_paragraph) && (
+            <GlassCard className="mb-8 p-6" hover={false}>
+              <h3 className="text-lg font-semibold text-text-primary mb-3">Analysis Verdict</h3>
+              {analysis?.verdict && (
+                <p className="text-text-secondary text-sm mb-3">
+                  {analysis.verdict}
                 </p>
-                <p className="text-text-tertiary text-xs mb-4">
-                  Document ID: {documentId || "Not available"}
+              )}
+              {analysis?.summary_paragraph && (
+                <p className="text-text-primary text-sm leading-relaxed">
+                  {analysis.summary_paragraph}
                 </p>
-                <Button
-                  variant="primary"
-                  className="flex items-center gap-2"
-                  onClick={() => runExtractionAndAnalysis(true)}
-                  disabled={!documentId || extracting}
-                  loading={extracting}
-                >
-                  <RefreshCw size={16} />
-                  Extract SLA & Analyze
-                </Button>
-              </GlassCard>
+              )}
+            </GlassCard>
+          )}
 
-              <GlassCard className="p-6 animate-slide-up" style={{ animationDelay: "0.1s" }}>
-                <h3 className="text-lg font-semibold text-text-primary mb-2">
-                  VIN Lookup (NHTSA)
-                </h3>
-                <p className="text-text-secondary text-sm mb-4">
-                  Enter a VIN to verify make, model, and year directly from the
-                  NHTSA database.
-                </p>
-                <form onSubmit={handleLookupVin} className="space-y-3">
-                  <Input
-                    label="VIN"
-                    placeholder="Enter 17-character VIN"
-                    value={vinInput}
-                    onChange={(e) => setVinInput(e.target.value.toUpperCase())}
-                    disabled={lookingUpVin}
-                  />
-                  <Button
-                    type="submit"
-                    variant="secondary"
-                    className="flex items-center gap-2"
-                    disabled={lookingUpVin}
-                    loading={lookingUpVin}
-                  >
-                    <Search size={16} />
-                    Check VIN with NHTSA
-                  </Button>
-                </form>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8 animate-slide-up">
+            <SLADataCard label="APR" value={formatPercent(sla?.apr)} icon="📊" />
+            <SLADataCard label="Monthly" value={formatMoney(sla?.monthly_payment)} icon="💵" />
+            <SLADataCard label="Term" value={formatLoanTerm(sla?.loan_term)} icon="📅" />
+            <SLADataCard label="Total" value={formatMoney(sla?.total_payment)} icon="🧾" />
+            <GlassCard className="p-4 text-center" hover={false}>
+              <p className="text-text-tertiary text-xs mb-2">Deal Score</p>
+              <p className={`text-3xl font-bold ${dealCategory === "good" ? "text-green-400" : dealCategory === "mid" ? "text-yellow-300" : "text-red-400"}`}>
+                {dealScore}/100
+              </p>
+              <span className={`mt-2 inline-flex text-xs font-semibold px-2 py-1 rounded-full border ${categoryClass(dealCategory)}`}>
+                {dealCategory.toUpperCase()}
+              </span>
+            </GlassCard>
+          </div>
 
-                {vinResult && (
-                  <div className="mt-5 p-4 rounded-lg bg-accent-blue/10 border border-accent-blue/30">
-                    <p className="text-xs uppercase tracking-wide text-accent-blue mb-3">
-                      Fetched from NHTSA
-                    </p>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between gap-3">
-                        <span className="text-text-secondary">VIN</span>
-                        <span className="text-text-primary font-medium text-right break-all">
-                          {vinResult.vin || "N/A"}
-                        </span>
-                      </div>
-                      <div className="flex justify-between gap-3">
-                        <span className="text-text-secondary">Make</span>
-                        <span className="text-text-primary font-medium text-right">
-                          {vinResult.make || "N/A"}
-                        </span>
-                      </div>
-                      <div className="flex justify-between gap-3">
-                        <span className="text-text-secondary">Model</span>
-                        <span className="text-text-primary font-medium text-right">
-                          {vinResult.model || "N/A"}
-                        </span>
-                      </div>
-                      <div className="flex justify-between gap-3">
-                        <span className="text-text-secondary">Model Year</span>
-                        <span className="text-text-primary font-medium text-right">
-                          {vinResult.model_year || "N/A"}
-                        </span>
-                      </div>
-                    </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <GlassCard className="lg:col-span-1" hover={false}>
+              <h3 className="text-lg font-semibold text-text-primary mb-4">Risk Summary</h3>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm text-text-secondary">Overall Risk</p>
+                <span className={`text-xs font-semibold px-3 py-1 rounded-full border ${riskClass(analysis?.risk_level)}`}>
+                  {String(analysis?.risk_level || "Unknown").toUpperCase()}
+                </span>
+              </div>
+              <div className="space-y-3">
+                {issues.length > 0 ? issues.map((issue, index) => (
+                  <div key={`${issue}-${index}`} className="p-3 rounded-lg bg-white/5 border border-white/10 text-sm text-text-secondary">
+                    {issue}
+                  </div>
+                )) : (
+                  <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-300 text-sm">
+                    No major risk flags detected.
                   </div>
                 )}
-              </GlassCard>
+              </div>
+            </GlassCard>
+
+            <GlassCard className="lg:col-span-2" hover={false}>
+              <h3 className="text-lg font-semibold text-text-primary mb-4">Detailed SLA Extraction Coverage</h3>
+              <div className="mb-4">
+                <p className="text-sm text-text-secondary mb-1">
+                  Fields Extracted: {completeness.present_fields}/{completeness.total_fields}
+                </p>
+                <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full ${completeness.completion_percent >= 85 ? "bg-green-500" : completeness.completion_percent >= 65 ? "bg-yellow-400" : "bg-red-500"}`}
+                    style={{ width: `${Math.max(4, Number(completeness.completion_percent || 0))}%` }}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <ExtractionRow label="Borrower" value={sla?.borrower_name} />
+                <ExtractionRow label="Lender" value={sla?.lender_name} />
+                <ExtractionRow label="Due Date" value={sla?.due_date} />
+                <ExtractionRow label="VIN" value={sla?.vin} />
+              </div>
+            </GlassCard>
+          </div>
+
+          {(hasAnalysis || hasSla) && (
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+              {hasAnalysis ? (
+                <GlassCard className="xl:col-span-1" hover={false}>
+                  <h3 className="text-lg font-semibold text-text-primary mb-4">Overall Score</h3>
+                  <div className="max-w-xs mx-auto">
+                    <Doughnut data={doughnutData} options={{ plugins: { legend: { display: false } } }} />
+                  </div>
+                </GlassCard>
+              ) : (
+                <GlassCard className="xl:col-span-1" hover={false}>
+                  <h3 className="text-lg font-semibold text-text-primary mb-4">Overall Score</h3>
+                  <p className="text-text-secondary text-sm">Analysis not available yet.</p>
+                </GlassCard>
+              )}
+
+              {hasAnalysis && breakdownItems.length > 0 ? (
+                <GlassCard className="xl:col-span-1" hover={false}>
+                  <h3 className="text-lg font-semibold text-text-primary mb-4">Score Breakdown Radar</h3>
+                  <Radar
+                    data={radarData}
+                    options={{
+                      scales: {
+                        r: {
+                          angleLines: { color: "rgba(255,255,255,0.12)" },
+                          grid: { color: "rgba(255,255,255,0.12)" },
+                          pointLabels: { color: "#d4d4d8", font: { size: 11 } },
+                          ticks: { display: false },
+                          suggestedMin: 0,
+                          suggestedMax: 20,
+                        },
+                      },
+                      plugins: { legend: { display: false } },
+                    }}
+                  />
+                </GlassCard>
+              ) : (
+                <GlassCard className="xl:col-span-1" hover={false}>
+                  <h3 className="text-lg font-semibold text-text-primary mb-4">Score Breakdown Radar</h3>
+                  <p className="text-text-secondary text-sm">No score breakdown data available.</p>
+                </GlassCard>
+              )}
+
+              {hasSla ? (
+                <GlassCard className="xl:col-span-1" hover={false}>
+                  <h3 className="text-lg font-semibold text-text-primary mb-4">SLA Numerical Profile</h3>
+                  <Bar
+                    data={barData}
+                    options={{
+                      scales: {
+                        x: { ticks: { color: "#d4d4d8" }, grid: { color: "rgba(255,255,255,0.08)" } },
+                        y: { ticks: { color: "#d4d4d8" }, grid: { color: "rgba(255,255,255,0.08)" } },
+                      },
+                      plugins: { legend: { display: false } },
+                    }}
+                  />
+                </GlassCard>
+              ) : (
+                <GlassCard className="xl:col-span-1" hover={false}>
+                  <h3 className="text-lg font-semibold text-text-primary mb-4">SLA Numerical Profile</h3>
+                  <p className="text-text-secondary text-sm">SLA extraction not available yet.</p>
+                </GlassCard>
+              )}
             </div>
           )}
 
-          {activeTab === "analysis" && (
-            sla || analysis ? (
-              <>
-                {/* SLA Data Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 animate-slide-up">
-                  <SLADataCard
-                    label="Annual Percentage Rate"
-                    value={formatPercent(sla?.apr)}
-                    icon="📊"
-                  />
-                  <SLADataCard
-                    label="Monthly Payment"
-                    value={formatMoney(sla?.monthly_payment)}
-                    icon="💰"
-                  />
-                  <SLADataCard
-                    label="Loan Term"
-                    value={formatLoanTerm(sla?.loan_term)}
-                    icon="📅"
-                  />
-                  <SLADataCard
-                    label="Total Payment"
-                    value={formatMoney(sla?.total_payment)}
-                    icon="💳"
-                  />
+          <GlassCard className="mb-8" hover={false}>
+            <h3 className="text-lg font-semibold text-text-primary mb-4">Score-Wise Detailed Report</h3>
+            <div className="space-y-3 mb-5">
+              {Object.entries(scoreBreakdown).map(([key, item]) => (
+                <div key={key} className="p-3 rounded-lg bg-white/5 border border-white/10 flex items-center justify-between">
+                  <p className="text-text-secondary text-sm">{item.label}</p>
+                  <p className="font-semibold text-text-primary">{item.score}/{item.max_score}</p>
                 </div>
+              ))}
+            </div>
 
-                {/* Detailed Information */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                  {/* Vehicle Information */}
-                  <GlassCard className="lg:col-span-1 animate-slide-in-left">
-                    <h3 className="text-lg font-semibold text-text-primary mb-4">
-                      Vehicle Information
-                    </h3>
-                    <div className="space-y-3">
-                      <InfoRow
-                        label="VIN"
-                        value={
-                          effectiveVehicle.vin ||
-                          sla?.vin ||
-                          "Not extracted"
-                        }
-                      />
-                      <InfoRow
-                        label="Make / Model"
-                        value={
-                          effectiveVehicle.make && effectiveVehicle.model
-                            ? `${effectiveVehicle.make} ${effectiveVehicle.model}`
-                            : marketVehicle.make && marketVehicle.model
-                              ? `${marketVehicle.make} ${marketVehicle.model}`
-                              : "N/A"
-                        }
-                      />
-                      <InfoRow
-                        label="Model Year"
-                        value={
-                          effectiveVehicle.model_year || marketVehicle.year || "N/A"
-                        }
-                      />
-                      <InfoRow
-                        label="Lender"
-                        value={sla?.lender_name || "N/A"}
-                      />
-                      <InfoRow
-                        label="Vehicle Price"
-                        value={
-                          sla?.vehicle_price
-                            ? formatMoney(sla.vehicle_price)
-                            : marketVehicle.estimated_market_price
-                              ? formatMoney(marketVehicle.estimated_market_price)
-                              : "$N/A"
-                        }
-                      />
-                    </div>
-                  </GlassCard>
+            <h4 className="text-base font-semibold text-text-primary mb-3">Negotiation Suggestions</h4>
+            <div className="space-y-3 mb-6">
+              {suggestions.length > 0 ? suggestions.map((item, index) => (
+                <SuggestionItem key={`${item}-${index}`} text={item} />
+              )) : (
+                <p className="text-text-secondary text-sm">No suggestions available yet.</p>
+              )}
+            </div>
 
-                  {/* Risk Analysis */}
-                  <GlassCard
-                    className="lg:col-span-2 animate-slide-in-right"
-                    style={{ animationDelay: "0.1s" }}
-                  >
-                    <h3 className="text-lg font-semibold text-text-primary mb-4">
-                      Risk Analysis
-                    </h3>
-                    <div className="mb-4 flex items-center justify-between">
-                      <p className="text-sm text-text-secondary">Overall Risk Level</p>
-                      <span
-                        className={`text-xs font-semibold px-3 py-1 rounded-full border ${
-                          riskLevel.toLowerCase() === "high"
-                            ? "bg-red-500/10 text-red-400 border-red-500/30"
-                            : riskLevel.toLowerCase() === "medium"
-                              ? "bg-orange-500/10 text-orange-400 border-orange-500/30"
-                              : "bg-green-500/10 text-green-400 border-green-500/30"
-                        }`}
-                      >
-                        {String(riskLevel).toUpperCase()}
-                      </span>
-                    </div>
-                    <div className="space-y-3">
-                      {issues.length > 0 ? (
-                        issues.map((issue, index) => (
-                          <RiskItem
-                            key={`${issue}-${index}`}
-                            title={issue}
-                            severity={issueSeverity(issue, riskLevel)}
-                            details="Detected from SLA terms, pricing, and market checks"
-                          />
-                        ))
-                      ) : (
-                        <RiskItem
-                          title="No issues identified yet"
-                          severity="low"
-                          details="Run analysis after SLA extraction to generate risk findings"
-                        />
-                      )}
-                    </div>
-                  </GlassCard>
-                </div>
-
-                {/* Negotiation Suggestions */}
-                <GlassCard
-                  className="mb-8 animate-slide-up"
-                  style={{ animationDelay: "0.2s" }}
-                >
-                  <h3 className="text-lg font-semibold text-text-primary mb-4">
-                    💡 Negotiation Suggestions
-                  </h3>
-                  <div className="space-y-3">
-                    {suggestions.map((item, index) => (
-                      <SuggestionItem key={`${item}-${index}`} text={item} />
-                    ))}
-                  </div>
-                  <div className="mt-6 flex gap-3">
-                    <Button variant="primary" onClick={() => navigate("/chat")}>
-                      Chat with AI Advisor
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={() => navigate("/comparison")}
-                    >
-                      Compare Offers
-                    </Button>
-                  </div>
-                </GlassCard>
-              </>
-            ) : (
-              <GlassCard className="p-12 text-center">
-                <p className="text-text-secondary">No analysis available</p>
-              </GlassCard>
-            )
-          )}
+            <Button variant="primary" onClick={() => navigate("/chat")}>Chat with AI Advisor</Button>
+          </GlassCard>
         </div>
       </main>
     </div>
@@ -543,7 +503,7 @@ export default function AnalysisPage() {
 
 function SLADataCard({ label, value, icon }) {
   return (
-    <GlassCard className="p-4 text-center">
+    <GlassCard className="p-4 text-center" hover={false}>
       <div className="text-3xl mb-2">{icon}</div>
       <p className="text-text-tertiary text-xs mb-2">{label}</p>
       <p className="text-2xl font-bold text-text-primary">{value}</p>
@@ -551,45 +511,22 @@ function SLADataCard({ label, value, icon }) {
   );
 }
 
-function InfoRow({ label, value }) {
+function ExtractionRow({ label, value }) {
+  const hasValue = String(value || "").trim().length > 0;
   return (
-    <div className="flex justify-between items-center py-2 border-b border-white/10">
+    <div className={`flex justify-between py-2 px-3 rounded-lg border ${hasValue ? "bg-green-500/5 border-green-500/20" : "bg-red-500/5 border-red-500/20"}`}>
       <span className="text-text-secondary text-sm">{label}</span>
-      <span className="font-semibold text-text-primary">{value}</span>
-    </div>
-  );
-}
-
-function RiskItem({ title, severity, details }) {
-  const severityColors = {
-    low: "bg-green-500/10 text-green-400 border-green-500/30",
-    medium: "bg-orange-500/10 text-orange-400 border-orange-500/30",
-    high: "bg-red-500/10 text-red-400 border-red-500/30",
-  };
-
-  return (
-    <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-      <div className="flex items-center justify-between mb-2">
-        <h4 className="font-semibold text-text-primary">{title}</h4>
-        <span
-          className={`text-xs font-semibold px-2 py-1 rounded-full border ${
-            severityColors[severity]
-          }`}
-        >
-          {severity.toUpperCase()}
-        </span>
-      </div>
-      <p className="text-sm text-text-secondary">{details}</p>
+      <span className={`text-sm font-semibold ${hasValue ? "text-green-300" : "text-red-300"}`}>
+        {hasValue ? value : "Missing"}
+      </span>
     </div>
   );
 }
 
 function SuggestionItem({ text }) {
   return (
-    <div className="flex gap-3 p-3 rounded-lg bg-accent-blue/10 border border-accent-blue/30">
-      <span className="text-accent-blue font-bold flex-shrink-0 text-lg">
-        ✓
-      </span>
+    <div className="flex gap-3 p-3 rounded-lg bg-accent-red/10 border border-accent-red/30">
+      <span className="text-accent-red-light font-bold flex-shrink-0 text-lg">✓</span>
       <span className="text-text-secondary text-sm">{text}</span>
     </div>
   );

@@ -14,7 +14,7 @@ export default function ChatAssistant() {
     setLoading(true);
 
     try {
-      const data = await chatWithAssistant(text, Number(documentId));
+      const data = await chatWithAssistant(text, documentId ? Number(documentId) : undefined);
       setMessages((prev) => [...prev, { role: "assistant", text: data.reply }]);
     } catch (err) {
       const detail =

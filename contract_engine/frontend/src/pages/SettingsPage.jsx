@@ -9,7 +9,7 @@ export default function SettingsPage() {
     <div className="flex min-h-screen bg-gradient-to-br from-bg-primary via-bg-secondary to-bg-tertiary">
       <Navbar />
 
-      <main className="flex-1 ml-72 p-8 overflow-y-auto max-h-screen">
+      <main className="main-content flex-1 ml-72 p-8 overflow-y-auto max-h-screen">
         <div className="max-w-4xl mx-auto">
           <div className="mb-8 animate-fade-in">
             <h1 className="text-4xl font-bold text-text-primary mb-2">

@@ -11,6 +11,7 @@ import ChatAssistantPage from "./pages/ChatAssistantPage";
 import HistoryPage from "./pages/HistoryPage";
 import ComparisonPage from "./pages/ComparisonPage";
 import SettingsPage from "./pages/SettingsPage";
+import VinLookupPage from "./pages/VinLookupPage";
 
 export default function App() {
   return (
@@ -43,6 +44,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <AnalysisPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/vin"
+          element={
+            <ProtectedRoute>
+              <VinLookupPage />
             </ProtectedRoute>
           }
         />

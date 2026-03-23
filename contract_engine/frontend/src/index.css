@@ -1,27 +1,42 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* LEASIFY - Premium Dark Theme with Frosted Glass UI */
+/* LEASIFY — Premium RED Theme with Frosted Glass & Neon Accents */
 
 /* Color Palette */
 :root {
   /* Primary Background */
-  --bg-primary: #0f1419;
-  --bg-secondary: #1a1f2e;
-  --bg-tertiary: #232a3a;
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #111118;
+  --bg-tertiary: #1a1a24;
 
   /* Glass Panel Colors */
-  --glass-light: rgba(255, 255, 255, 0.05);
-  --glass-lighter: rgba(255, 255, 255, 0.08);
+  --glass-light: rgba(255, 255, 255, 0.04);
+  --glass-lighter: rgba(255, 255, 255, 0.07);
   --glass-medium: rgba(255, 255, 255, 0.1);
 
-  /* Accent Colors */
-  --accent-blue: #3b82f6;
-  --accent-blue-dark: #1e40af;
-  --accent-blue-light: #60a5fa;
-  --accent-orange: #f97316;
-  --accent-orange-light: #fb923c;
+  /* Accent Colors — RED */
+  --accent-red: #dc2626;
+  --accent-red-dark: #991b1b;
+  --accent-red-light: #f87171;
+  --accent-red-glow: #ef4444;
+
+  /* Secondary — Gold */
+  --accent-gold: #f59e0b;
+  --accent-gold-light: #fbbf24;
+
+  /* Neon */
+  --accent-neon: #ff3b3b;
+
+  /* Legacy aliases */
+  --accent-blue: #dc2626;
+  --accent-blue-dark: #991b1b;
+  --accent-blue-light: #f87171;
+  --accent-orange: #f59e0b;
+  --accent-orange-light: #fbbf24;
 
   /* Text Colors */
   --text-primary: #f5f5f5;
@@ -29,14 +44,15 @@
   --text-tertiary: #71717a;
 
   /* Border Colors */
-  --border-light: rgba(255, 255, 255, 0.1);
-  --border-medium: rgba(255, 255, 255, 0.15);
+  --border-light: rgba(255, 255, 255, 0.08);
+  --border-medium: rgba(255, 255, 255, 0.12);
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.2);
-  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.25);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.2);
+  --shadow-red: 0 0 20px rgba(220, 38, 38, 0.15);
 }
 
 html,
@@ -49,81 +65,66 @@ body,
 }
 
 body {
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu",
-    "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+  font-family: 'Inter', 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: linear-gradient(
-    135deg,
-    var(--bg-primary) 0%,
-    var(--bg-secondary) 100%
-  );
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 50%, var(--bg-tertiary) 100%);
   color: var(--text-primary);
 }
 
-/* Typography Styles */
+/* Typography */
 h1 {
+  font-family: 'Outfit', 'Inter', sans-serif;
   font-size: 2.5rem;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
 }
-
 h2 {
+  font-family: 'Outfit', 'Inter', sans-serif;
   font-size: 2rem;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
 }
+h3 { font-size: 1.5rem; font-weight: 600; }
+h4 { font-size: 1.25rem; font-weight: 500; }
+p { font-size: 1rem; line-height: 1.6; color: var(--text-secondary); }
 
-h3 {
-  font-size: 1.5rem;
-  font-weight: 600;
-}
-
-h4 {
-  font-size: 1.25rem;
-  font-weight: 500;
-}
-
-p {
-  font-size: 1rem;
-  line-height: 1.6;
-  color: var(--text-secondary);
-}
-
-/* Glass Panel Base Style */
+/* ─── Glass Panel Styles ───────────────────────────────────────────────── */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
 .glass-panel:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.15);
-  box-shadow: 0 8px 32px rgba(59, 130, 246, 0.1);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(220, 38, 38, 0.25);
+  box-shadow: 0 8px 32px rgba(220, 38, 38, 0.08);
 }
 
 .glass-card {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
   padding: 1.5rem;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
 .glass-card:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.15);
-  box-shadow: 0 8px 32px rgba(59, 130, 246, 0.1);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(220, 38, 38, 0.2);
+  box-shadow: 0 8px 32px rgba(220, 38, 38, 0.06);
 }
 
-/* Input Styles */
+/* Metallic gradient utility */
+.metallic-gradient {
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.15) 0%, rgba(255, 59, 59, 0.05) 50%, rgba(220, 38, 38, 0.1) 100%);
+}
+
+/* ─── Input Styles ─────────────────────────────────────────────────────── */
 input[type="text"],
 input[type="email"],
 input[type="password"],
@@ -138,219 +139,280 @@ select {
   font-size: 1rem;
   transition: all 0.2s ease-out;
 }
-
 input::placeholder,
 textarea::placeholder {
   color: var(--text-tertiary);
 }
-
 input:focus,
 textarea:focus,
 select:focus {
   outline: none;
   background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(59, 130, 246, 0.5);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: rgba(220, 38, 38, 0.5);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
 }
 
-/* Button Styles */
+/* ─── Button Styles ────────────────────────────────────────────────────── */
 @layer components {
   .btn {
     @apply px-6 py-2 rounded-lg font-medium transition-all duration-300 cursor-pointer;
   }
-
   .btn-primary {
-    @apply bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl;
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    @apply text-white shadow-lg;
   }
-
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    box-shadow: 0 4px 20px rgba(220, 38, 38, 0.35);
+  }
   .btn-secondary {
     @apply bg-white/10 hover:bg-white/15 border border-white/20 text-white;
   }
-
   .btn-accent {
-    @apply bg-orange-500 hover:bg-orange-600 text-white shadow-lg hover:shadow-xl;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    @apply text-white shadow-lg;
   }
-
+  .btn-accent:hover {
+    box-shadow: 0 4px 20px rgba(245, 158, 11, 0.35);
+  }
   .btn-ghost {
     @apply text-white/80 hover:text-white hover:bg-white/5;
   }
-
   .btn-small {
     @apply px-4 py-1.5 text-sm;
   }
-
   .btn-large {
     @apply px-8 py-3 text-lg;
   }
 }
 
-/* Scrollbar Styling */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* ─── Scrollbar ────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(220, 38, 38, 0.2); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(220, 38, 38, 0.35); }
+
+/* ─── Skeleton Loader ──────────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 8px;
 }
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-/* Animations */
+/* ─── Animations ───────────────────────────────────────────────────────── */
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
-
 @keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-
 @keyframes slideInRight {
-  from {
-    opacity: 0;
-    transform: translateX(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
 }
-
 @keyframes slideInLeft {
-  from {
-    opacity: 0;
-    transform: translateX(-30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  from { opacity: 0; transform: translateX(-30px); }
+  to { opacity: 1; transform: translateX(0); }
 }
-
 @keyframes glow {
-  0%,
-  100% {
-    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
-  }
-  50% {
-    box-shadow: 0 0 30px rgba(59, 130, 246, 0.5);
-  }
+  0%, 100% { box-shadow: 0 0 20px rgba(220, 38, 38, 0.3); }
+  50% { box-shadow: 0 0 30px rgba(220, 38, 38, 0.5); }
 }
-
 @keyframes pulse-slow {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.8;
-  }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
 }
-
 @keyframes spin-slow {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
-
 @keyframes carFloat {
-  0%,
-  100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
 }
-
 @keyframes carMove {
-  0% {
-    transform: translateX(-32px);
-  }
-  50% {
-    transform: translateX(32px);
-  }
-  100% {
-    transform: translateX(-32px);
-  }
+  0% { transform: translateX(-32px); }
+  50% { transform: translateX(32px); }
+  100% { transform: translateX(-32px); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes neonPulse {
+  0%, 100% { box-shadow: 0 0 5px rgba(255, 59, 59, 0.4), 0 0 20px rgba(255, 59, 59, 0.2); }
+  50% { box-shadow: 0 0 10px rgba(255, 59, 59, 0.6), 0 0 40px rgba(255, 59, 59, 0.3); }
 }
 
-/* Animation Classes */
-.animate-fade-in {
-  animation: fadeIn 0.6s ease-out forwards;
+.animate-fade-in { animation: fadeIn 0.6s ease-out forwards; }
+.animate-slide-up { animation: slideUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+.animate-slide-in-right { animation: slideInRight 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+.animate-slide-in-left { animation: slideInLeft 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+.animate-glow { animation: glow 2s ease-in-out infinite; }
+.animate-pulse-slow { animation: pulse-slow 3s ease-in-out infinite; }
+.animate-spin-slow { animation: spin-slow 20s linear infinite; }
+.animate-car-float { animation: carFloat 3s ease-in-out infinite; }
+.animate-car-move { animation: carMove 2.8s ease-in-out infinite; }
+.animate-neon-pulse { animation: neonPulse 2s ease-in-out infinite; }
+
+/* ─── Sports Car Animation (RED themed) ────────────────────────────────── */
+@keyframes sportsCarDrive {
+  0% { transform: translateX(-84px) translateY(0) rotateY(0deg); }
+  12% { transform: translateX(-10px) translateY(-1px) rotateY(-2deg); }
+  40% { transform: translateX(140px) translateY(1px) rotateY(1deg); }
+  70% { transform: translateX(278px) translateY(0) rotateY(0deg); }
+  100% { transform: translateX(420px) translateY(0) rotateY(1deg); }
+}
+@keyframes wheelSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes smokeDrift {
+  0% { opacity: 0.35; transform: translate3d(0, 0, 0) scale(0.45); }
+  65% { opacity: 0.18; transform: translate3d(-34px, -12px, 0) scale(0.95); }
+  100% { opacity: 0; transform: translate3d(-58px, -20px, 0) scale(1.2); }
 }
 
-.animate-slide-up {
-  animation: slideUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+.animate-sports-car-drive {
+  animation: sportsCarDrive 1.95s linear infinite;
 }
 
-.animate-slide-in-right {
-  animation: slideInRight 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+.login-race-scene {
+  margin-top: 0.75rem;
+  width: min(430px, 92%);
+  height: 168px;
+  border-radius: 18px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  background:
+    radial-gradient(120% 90% at 76% 0%, rgba(220, 38, 38, 0.2), transparent 58%),
+    radial-gradient(80% 70% at 12% 10%, rgba(255, 59, 59, 0.15), transparent 65%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+  box-shadow: inset 0 -25px 40px rgba(0, 0, 0, 0.35), 0 0 30px rgba(220, 38, 38, 0.08);
+  perspective: 900px;
+}
+.race-horizon {
+  position: absolute; top: 56px; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(220, 38, 38, 0.3), transparent);
+}
+.race-track {
+  position: absolute; inset: 0;
+  transform: rotateX(48deg) translateY(34px);
+  transform-style: preserve-3d;
+}
+.track-line {
+  position: absolute;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(220, 38, 38, 0.35), transparent);
+}
+.track-line-1 { left: 20px; right: 20px; top: 112px; }
+.track-line-2 { left: 44px; right: 44px; top: 124px; opacity: 0.72; }
+.track-line-3 { left: 72px; right: 72px; top: 136px; opacity: 0.58; }
+
+.sports-car-3d {
+  position: absolute; left: 0; top: 78px;
+  width: 140px; height: 58px;
+  transform-style: preserve-3d;
+  filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.32));
+}
+.car-body-shell {
+  position: absolute; left: 14px; top: 14px;
+  width: 106px; height: 28px;
+  border-radius: 20px 28px 10px 14px;
+  background: linear-gradient(145deg, #ff2020 0%, #dc2626 44%, #991b1b 100%);
+  transform: translateZ(7px);
+  box-shadow:
+    inset 0 -6px 10px rgba(0, 0, 0, 0.35),
+    inset 0 3px 4px rgba(255, 255, 255, 0.15),
+    0 0 20px rgba(220, 38, 38, 0.2);
+}
+.car-cabin {
+  position: absolute; left: 30px; top: -11px;
+  width: 34px; height: 16px;
+  border-radius: 9px 10px 2px 3px;
+  background: linear-gradient(160deg, rgba(172, 220, 255, 0.85), rgba(76, 121, 171, 0.6));
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+.car-spoiler {
+  position: absolute; right: 4px; top: -6px;
+  width: 16px; height: 7px; border-radius: 3px;
+  background: linear-gradient(180deg, #1a1a24, #374151);
+}
+.car-headlight {
+  position: absolute; left: 1px; top: 9px;
+  width: 7px; height: 6px; border-radius: 4px;
+  background: #ffe08a;
+  box-shadow: 0 0 12px rgba(255, 224, 138, 0.7);
+}
+.car-wheel {
+  position: absolute; bottom: 5px;
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid #1f2937;
+  background: radial-gradient(circle at 35% 35%, #6b7280 0%, #1f2937 66%);
+  box-shadow: inset 0 0 0 2px #4b5563;
+  animation: wheelSpin 0.38s linear infinite;
+}
+.wheel-front { left: 84px; }
+.wheel-rear { left: 30px; }
+.car-shadow {
+  position: absolute; left: 16px; top: 38px;
+  width: 96px; height: 12px; border-radius: 50%;
+  background: rgba(0, 0, 0, 0.34);
+  filter: blur(2px);
+  transform: translateZ(-4px);
+}
+.car-smoke {
+  position: absolute; left: 6px; bottom: 14px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.55), rgba(200, 210, 224, 0.08));
+  filter: blur(1px);
+  pointer-events: none;
+  animation: smokeDrift 1.35s ease-out infinite;
+}
+.smoke-1 { animation-delay: 0s; }
+.smoke-2 { left: 2px; animation-delay: 0.32s; }
+.smoke-3 { left: 10px; animation-delay: 0.64s; }
+
+@media (max-width: 1280px) {
+  .login-race-scene { width: min(390px, 92%); }
 }
 
-.animate-slide-in-left {
-  animation: slideInLeft 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-.animate-glow {
-  animation: glow 2s ease-in-out infinite;
-}
-
-.animate-pulse-slow {
-  animation: pulse-slow 3s ease-in-out infinite;
-}
-
-.animate-spin-slow {
-  animation: spin-slow 20s linear infinite;
-}
-
-.animate-car-float {
-  animation: carFloat 3s ease-in-out infinite;
-}
-
-.animate-car-move {
-  animation: carMove 2.8s ease-in-out infinite;
-}
-
-/* Loading Spinner */
+/* ─── Loading Spinner (RED) ────────────────────────────────────────────── */
 .spinner {
-  width: 40px;
-  height: 40px;
+  width: 40px; height: 40px;
   border: 2px solid rgba(255, 255, 255, 0.1);
-  border-top: 2px solid var(--accent-blue);
+  border-top: 2px solid var(--accent-red);
   border-radius: 50%;
   animation: spin-slow 1s linear infinite;
 }
 
+/* ─── Risk & Status Colors ─────────────────────────────────────────────── */
+.risk-high { color: #ef4444; background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); }
+.risk-medium { color: #f59e0b; background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.3); }
+.risk-low { color: #22c55e; background: rgba(34, 197, 94, 0.1); border-color: rgba(34, 197, 94, 0.3); }
+.clause-good { color: #22c55e; background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 8px; }
+.clause-bad { color: #ef4444; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; }
+
 /* Focus States */
-*:focus-visible {
-  outline: none;
-}
+*:focus-visible { outline: none; }
 
 /* Selection Color */
 ::selection {
-  background-color: var(--accent-blue);
+  background-color: var(--accent-red);
   color: var(--text-primary);
+}
+
+/* ─── Mobile Bottom Nav ────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .sidebar-nav { display: none !important; }
+  .main-content { margin-left: 0 !important; padding-bottom: 5rem !important; }
 }

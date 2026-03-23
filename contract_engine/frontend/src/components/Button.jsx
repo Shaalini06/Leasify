@@ -1,5 +1,3 @@
-import React from "react";
-
 const Button = ({
   children,
   variant = "primary",
@@ -8,34 +6,33 @@ const Button = ({
   loading = false,
   onClick,
   className = "",
+  type = "button",
   ...props
 }) => {
-  const baseStyles = "btn transition-all duration-300 font-medium rounded-lg";
+  const baseStyles = "btn transition-all duration-300 font-medium rounded-lg inline-flex items-center justify-center";
 
   const variants = {
-    primary:
-      "bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl hover:scale-105",
-    secondary:
-      "bg-white/10 hover:bg-white/15 border border-white/20 text-white hover:border-white/30",
-    accent:
-      "bg-orange-500 hover:bg-orange-600 text-white shadow-lg hover:shadow-xl hover:scale-105",
+    primary: "bg-gradient-to-r from-accent-red to-accent-red-dark hover:from-accent-red-light hover:to-accent-red text-white shadow-lg hover:shadow-glow",
+    secondary: "bg-white/10 hover:bg-white/15 border border-white/20 text-white hover:border-white/30",
+    accent: "bg-gradient-to-r from-accent-gold to-yellow-600 hover:from-accent-gold-light hover:to-accent-gold text-white shadow-lg hover:shadow-glow-gold",
     ghost: "text-text-secondary hover:text-text-primary hover:bg-white/5",
     danger: "bg-red-600 hover:bg-red-700 text-white shadow-lg hover:shadow-xl",
   };
 
   const sizes = {
     sm: "px-3 py-1.5 text-sm",
-    md: "px-6 py-2.5 text-base",
-    lg: "px-8 py-3 text-lg",
-    xl: "px-10 py-4 text-xl",
+    md: "px-6 py-2.5 text-sm",
+    lg: "px-8 py-3 text-base",
+    xl: "px-10 py-4 text-lg",
   };
 
   return (
     <button
+      type={type}
       className={`
         ${baseStyles}
-        ${variants[variant]}
-        ${sizes[size]}
+        ${variants[variant] || variants.primary}
+        ${sizes[size] || sizes.md}
         ${disabled || loading ? "opacity-50 cursor-not-allowed" : ""}
         ${className}
       `}

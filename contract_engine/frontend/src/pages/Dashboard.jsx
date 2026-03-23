@@ -1,318 +1,83 @@
-import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import GlassCard from "../components/GlassCard";
-import DataCard from "../components/DataCard";
 import Button from "../components/Button";
-import { Spinner } from "../components/LoadingSpinner";
 import { getUserContracts } from "../services/api";
-import {
-  Upload,
-  BarChart2,
-  Zap,
-  Clock,
-  TrendingUp,
-  FileText,
-  Settings,
-} from "react-feather";
+import { Upload, Clock, BarChart2, MessageSquare, FileText, TrendingUp } from "react-feather";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [contracts, setContracts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalContracts: 0,
-    pendingReviews: 0,
-    avgAPR: 0,
-  });
+  const [stats, setStats] = useState({ total: 0, analyzed: 0, pending: 0, avgScore: 0 });
 
   useEffect(() => {
-    const fetchContracts = async () => {
-      try {
-        const data = await getUserContracts();
-        setContracts(data.contracts || []);
-
-        // Calculate stats
-        const total = data.contracts?.length || 0;
-        const avgAPR =
-          data.contracts?.reduce((sum, c) => sum + (c.sla?.apr || 0), 0) /
-            total || 0;
-
+    getUserContracts()
+      .then((data) => {
+        const contracts = data.contracts || [];
+        const analyzed = contracts.filter((c) => c.analyzed);
+        const scores = analyzed.map((c) => c.deal_score || 0).filter((s) => s > 0);
         setStats({
-          totalContracts: total,
-          pendingReviews:
-            data.contracts?.filter((c) => !c.analyzed).length || 0,
-          avgAPR: avgAPR.toFixed(2),
+          total: contracts.length,
+          analyzed: analyzed.length,
+          pending: contracts.length - analyzed.length,
+          avgScore: scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0,
         });
-      } catch (error) {
-        console.error("Failed to fetch contracts:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchContracts();
+      })
+      .catch(() => {});
   }, []);
+
+  const quickActions = [
+    { icon: Upload, label: "Upload Contract", desc: "Analyze a new lease or loan", to: "/upload", color: "from-accent-red to-accent-red-dark" },
+    { icon: Clock, label: "View History", desc: "Browse past analyses", to: "/history", color: "from-accent-gold to-yellow-700" },
+    { icon: BarChart2, label: "Compare Deals", desc: "Side-by-side comparison", to: "/comparison", color: "from-green-600 to-green-800" },
+    { icon: MessageSquare, label: "Negotiation AI", desc: "Get expert advice", to: "/chat", color: "from-purple-600 to-purple-800" },
+  ];
+
+  const statCards = [
+    { label: "Total Contracts", value: stats.total, icon: FileText, color: "text-accent-red-light" },
+    { label: "Analyzed", value: stats.analyzed, icon: TrendingUp, color: "text-green-400" },
+    { label: "Pending", value: stats.pending, icon: Clock, color: "text-accent-gold" },
+    { label: "Avg Score", value: stats.avgScore > 0 ? `${stats.avgScore}/100` : "—", icon: BarChart2, color: "text-purple-400" },
+  ];
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-bg-primary via-bg-secondary to-bg-tertiary">
       <Navbar />
-
-      <main className="flex-1 ml-72 p-8 overflow-y-auto max-h-screen">
-        {/* Header */}
-        <div className="mb-8 animate-fade-in">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-4xl font-bold text-text-primary mb-2">
-                Dashboard
-              </h1>
-              <p className="text-text-secondary">
-                Welcome back. Here's what's happening with your leases.
-              </p>
-            </div>
-            <div className="flex gap-3">
-              <Button
-                variant="secondary"
-                size="md"
-                className="flex items-center gap-2"
-                onClick={() => navigate("/settings")}
-              >
-                <Settings size={18} />
-                Settings
-              </Button>
-              <Button
-                variant="primary"
-                size="md"
-                className="flex items-center gap-2"
-                onClick={() => navigate("/upload")}
-              >
-                <Upload size={18} />
-                Upload Contract
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 animate-slide-up">
-          <DataCard
-            icon={FileText}
-            label="Total Contracts"
-            value={stats.totalContracts}
-            subtext="Analyzed"
-          />
-          <DataCard
-            icon={Clock}
-            label="Pending Review"
-            value={stats.pendingReviews}
-            subtext="Awaiting analysis"
-          />
-          <DataCard
-            icon={TrendingUp}
-            label="Average APR"
-            value={`${stats.avgAPR}%`}
-            subtext="Across all deals"
-          />
-          <DataCard
-            icon={Zap}
-            label="Negotiations"
-            value="0"
-            subtext="Active conversations"
-          />
-        </div>
-
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Quick Actions */}
-          <div className="lg:col-span-1">
-            <h2 className="text-lg font-semibold text-text-primary mb-4">
-              Quick Actions
-            </h2>
-            <div
-              className="space-y-3 animate-slide-in-right"
-              style={{ animationDelay: "0.1s" }}
-            >
-              <ActionCard
-                icon={Upload}
-                title="Upload Contract"
-                description="Upload PDF or image"
-                onClick={() => navigate("/upload")}
-              />
-              <ActionCard
-                icon={BarChart2}
-                title="View Analysis"
-                description="Check extracted SLA data"
-                onClick={() => navigate("/analysis")}
-              />
-              <ActionCard
-                icon={Zap}
-                title="Negotiate"
-                description="Get AI advice"
-                onClick={() => navigate("/chat")}
-              />
-              <ActionCard
-                icon={Clock}
-                title="History"
-                description="View past contracts"
-                onClick={() => navigate("/history")}
-              />
-            </div>
+      <main className="main-content flex-1 ml-72 p-8 overflow-y-auto max-h-screen">
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-10 animate-fade-in">
+            <h1 className="text-4xl font-bold text-text-primary mb-2">Dashboard</h1>
+            <p className="text-text-secondary">Welcome back! Here's an overview of your contract analyses.</p>
           </div>
 
-          {/* Recent Contracts */}
-          <div className="lg:col-span-2">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-text-primary">
-                Recent Contracts
-              </h2>
-              <button className="text-accent-blue hover:text-accent-blue-light text-sm font-medium">
-                View all
-              </button>
-            </div>
-
-            {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <Spinner size="md" />
-              </div>
-            ) : contracts.length > 0 ? (
-              <div className="space-y-3 animate-slide-up">
-                {contracts.slice(0, 4).map((contract, idx) => (
-                  <ContractCard
-                    key={idx}
-                    contract={contract}
-                    onView={() => navigate(`/analysis?id=${contract.id}`)}
-                  />
-                ))}
-              </div>
-            ) : (
-              <GlassCard className="p-12 text-center">
-                <div className="inline-block p-4 rounded-lg bg-accent-blue/10 mb-4">
-                  <Upload size={32} className="text-accent-blue" />
+          {/* Stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-10 animate-slide-up">
+            {statCards.map(({ label, value, icon: Icon, color }) => (
+              <GlassCard key={label} className="p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-text-tertiary text-xs font-semibold uppercase tracking-wide">{label}</span>
+                  <Icon size={18} className={color} />
                 </div>
-                <h3 className="text-lg font-semibold text-text-primary mb-2">
-                  No contracts yet
-                </h3>
-                <p className="text-text-secondary mb-6">
-                  Upload your first lease or loan contract to get started
-                </p>
-                <Button variant="primary" onClick={() => navigate("/upload")}>
-                  Upload Contract
-                </Button>
+                <p className={`text-3xl font-bold ${color}`}>{value}</p>
               </GlassCard>
-            )}
+            ))}
           </div>
-        </div>
 
-        {/* Feature Highlights */}
-        <div
-          className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 animate-fade-in"
-          style={{ animationDelay: "0.2s" }}
-        >
-          <FeatureCard
-            icon="🔍"
-            title="AI-Powered Analysis"
-            description="Automatic extraction of lease terms, APR, and payment details using advanced OCR"
-          />
-          <FeatureCard
-            icon="💼"
-            title="Smart Negotiation"
-            description="Get AI-powered recommendations on how to negotiate better lease terms"
-          />
-          <FeatureCard
-            icon="📊"
-            title="Deal Comparison"
-            description="Compare multiple lease offers side-by-side to find the best deal"
-          />
+          {/* Quick Actions */}
+          <h2 className="text-xl font-bold text-text-primary mb-5">Quick Actions</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 animate-slide-up" style={{ animationDelay: "0.15s" }}>
+            {quickActions.map(({ icon: Icon, label, desc, to, color }) => (
+              <GlassCard hover key={label} className="p-6 cursor-pointer group" onClick={() => navigate(to)}>
+                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center mb-4 shadow-glow group-hover:scale-110 transition-transform duration-300`}>
+                  <Icon size={22} className="text-white" />
+                </div>
+                <h3 className="font-semibold text-text-primary mb-1">{label}</h3>
+                <p className="text-text-secondary text-sm">{desc}</p>
+              </GlassCard>
+            ))}
+          </div>
         </div>
       </main>
     </div>
-  );
-}
-
-function ActionCard({ icon: Icon, title, description, onClick }) {
-  return (
-    <GlassCard hover onClick={onClick} className="p-4 cursor-pointer group">
-      <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-lg bg-accent-blue/10 flex items-center justify-center flex-shrink-0 group-hover:bg-accent-blue/20">
-          <Icon size={20} className="text-accent-blue" />
-        </div>
-        <div className="flex-1">
-          <h3 className="font-semibold text-text-primary group-hover:text-accent-blue transition-colors">
-            {title}
-          </h3>
-          <p className="text-xs text-text-tertiary mt-1">{description}</p>
-        </div>
-      </div>
-    </GlassCard>
-  );
-}
-
-function ContractCard({ contract, onView }) {
-  return (
-    <GlassCard hover onClick={onView} className="p-4">
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-lg bg-accent-blue/10 flex items-center justify-center">
-              <FileText size={20} className="text-accent-blue" />
-            </div>
-            <h3 className="font-semibold text-text-primary">
-              {contract.filename || "Lease Agreement"}
-            </h3>
-          </div>
-          <div className="grid grid-cols-3 gap-4 ml-13">
-            {contract.sla && (
-              <>
-                <div>
-                  <p className="text-xs text-text-tertiary">APR</p>
-                  <p className="font-semibold text-accent-orange">
-                    {contract.sla.apr || "—"}%
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-text-tertiary">Monthly</p>
-                  <p className="font-semibold text-text-primary">
-                    ${contract.sla.monthly_payment || "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-text-tertiary">Term</p>
-                  <p className="font-semibold text-text-primary">
-                    {contract.sla.loan_term || "—"} mo
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-        <div className="text-right">
-          {contract.analyzed ? (
-            <div className="inline-flex items-center gap-1 px-3 py-1 bg-green-500/10 border border-green-500/30 rounded-full">
-              <span className="w-2 h-2 rounded-full bg-green-500"></span>
-              <span className="text-xs font-medium text-green-400">
-                Analyzed
-              </span>
-            </div>
-          ) : (
-            <div className="inline-flex items-center gap-1 px-3 py-1 bg-orange-500/10 border border-orange-500/30 rounded-full">
-              <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span>
-              <span className="text-xs font-medium text-orange-400">
-                Pending
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-    </GlassCard>
-  );
-}
-
-function FeatureCard({ icon, title, description }) {
-  return (
-    <GlassCard className="p-6 text-center">
-      <div className="text-4xl mb-4">{icon}</div>
-      <h3 className="font-semibold text-text-primary mb-2">{title}</h3>
-      <p className="text-sm text-text-secondary">{description}</p>
-    </GlassCard>
   );
 }

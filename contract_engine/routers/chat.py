@@ -1,6 +1,7 @@
 """Router for the Negotiation Assistant chatbot endpoint."""
 
 import logging
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.concurrency import run_in_threadpool
@@ -20,7 +21,10 @@ logger = logging.getLogger(__name__)
 class ChatRequest(BaseModel):
     """Input schema for a negotiation assistant message."""
     message: str = Field(..., min_length=1, description="The user's question or message.")
-    document_id: int = Field(..., description="ID of the uploaded contract document.")
+    document_id: Optional[int] = Field(
+        default=None,
+        description="Optional contract ID. When provided, assistant uses extracted SLA context.",
+    )
 
 
 class ChatResponse(BaseModel):
@@ -32,21 +36,22 @@ class ChatResponse(BaseModel):
 
 @router.post("/negotiation-assistant", response_model=ChatResponse)
 async def negotiation_assistant(body: ChatRequest, db: Session = Depends(get_db)):
-    """Accept a user question, enrich it with SLA context, and return negotiation advice."""
+    """Accept a user question and return AI advice with optional contract context."""
     try:
-        # Step 1: Fetch SLA data for the given document.
-        sla_record = (
-            db.query(SLAExtraction)
-            .filter(SLAExtraction.document_id == body.document_id)
-            .first()
-        )
-        if not sla_record or not isinstance(sla_record.extracted_json, dict):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Contract SLA data not found. Please extract SLA first.",
+        # Step 1: Use SLA context only when a contract is explicitly provided.
+        sla_data: dict = {}
+        if body.document_id is not None:
+            sla_record = (
+                db.query(SLAExtraction)
+                .filter(SLAExtraction.document_id == body.document_id)
+                .first()
             )
-
-        sla_data: dict = sla_record.extracted_json
+            if not sla_record or not isinstance(sla_record.extracted_json, dict):
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Contract SLA data not found. Please extract SLA first.",
+                )
+            sla_data = sla_record.extracted_json
 
         # Step 2: Call LLM in a threadpool (requests is synchronous).
         reply = await run_in_threadpool(get_negotiation_advice, sla_data, body.message)

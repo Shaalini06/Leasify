@@ -1,233 +1,91 @@
+import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { login as loginAPI } from "../services/api";
 import { useAuth } from "../context/AuthContext";
-import Input from "../components/Input";
-import Button from "../components/Button";
-import GlassCard from "../components/GlassCard";
-import Alert from "../components/Alert";
-import { LoadingScreen, Spinner } from "../components/LoadingSpinner";
-import { login } from "../services/api";
-import { Mail, Lock } from "react-feather";
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login: loginAuth } = useAuth();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showLoading, setShowLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
+    if (!email || !password) { setError("Please fill in all fields"); return; }
     setLoading(true);
-
+    setError("");
     try {
-      // Call API to login
-      const response = await login(email, password);
-
-      // Store auth token and navigate
-      loginAuth(response.user || { email }, response.token);
-
-      // Show loading screen
-      setShowLoading(true);
-      setTimeout(() => {
-        navigate("/dashboard");
-      }, 2000);
+      const data = await loginAPI(email, password);
+      login(data.user || { email }, data.token);
+      navigate("/dashboard");
     } catch (err) {
-      setError(
-        err.detail || err.message || "Failed to sign in. Please try again.",
-      );
+      const detail = err?.response?.data?.detail || err?.detail || (typeof err === "string" ? err : "Login failed. Please check your credentials.");
+      setError(detail);
+    } finally {
       setLoading(false);
     }
   };
 
-  const handleSignUp = () => {
-    navigate("/signup");
-  };
-
-  if (showLoading) {
-    return <LoadingScreen message="LEASIFY" />;
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-bg-primary via-bg-secondary to-bg-tertiary flex items-center justify-center relative overflow-hidden">
-      {/* Background elements */}
-      <div className="absolute inset-0">
-        <div className="absolute top-20 left-10 w-96 h-96 bg-accent-blue/10 rounded-full blur-3xl animate-pulse-slow"></div>
-        <div
-          className="absolute bottom-32 right-10 w-80 h-80 bg-accent-orange/10 rounded-full blur-3xl animate-pulse-slow"
-          style={{ animationDelay: "1s" }}
-        ></div>
-      </div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-bg-primary via-bg-secondary to-bg-tertiary relative overflow-hidden">
+      {/* Background glows */}
+      <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] rounded-full bg-accent-red/5 blur-3xl pointer-events-none" />
+      <div className="absolute bottom-[-10%] left-[-5%] w-[400px] h-[400px] rounded-full bg-accent-red/3 blur-3xl pointer-events-none" />
 
-      {/* Content */}
-      <div className="relative z-10 w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center min-h-screen">
-          {/* Left side - Info */}
-          <div className="hidden lg:flex flex-col justify-center space-y-8 animate-slide-in-left">
-            <div>
-              <h1 className="text-5xl font-bold text-text-primary mb-4">
-                Welcome to <span className="text-accent-blue">LEASIFY</span>
-              </h1>
-              <p className="text-xl text-text-secondary">
-                Understand your car lease before you sign
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-lg bg-accent-blue/20 flex items-center justify-center flex-shrink-0 mt-1">
-                  <span className="text-lg">📋</span>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-text-primary mb-1">
-                    Smart Contract Analysis
-                  </h3>
-                  <p className="text-text-secondary text-sm">
-                    AI-powered OCR extraction of lease terms and SLA data
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-lg bg-accent-orange/20 flex items-center justify-center flex-shrink-0 mt-1">
-                  <span className="text-lg">💡</span>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-text-primary mb-1">
-                    AI-Powered Negotiation
-                  </h3>
-                  <p className="text-text-secondary text-sm">
-                    Get intelligent advice on lease terms and negotiation tips
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-lg bg-accent-blue/20 flex items-center justify-center flex-shrink-0 mt-1">
-                  <span className="text-lg">🚗</span>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-text-primary mb-1">
-                    Vehicle Intelligence
-                  </h3>
-                  <p className="text-text-secondary text-sm">
-                    Complete vehicle data and market comparison insights
-                  </p>
-                </div>
-              </div>
-            </div>
+      <div className="w-full max-w-md mx-4 animate-slide-up">
+        {/* Brand */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-accent-red to-accent-red-dark mb-4 shadow-glow animate-neon-pulse">
+            <span className="text-3xl">🏎️</span>
           </div>
+          <h1 className="text-3xl font-extrabold text-text-primary" style={{ fontFamily: "'Outfit', sans-serif" }}>LEASIFY</h1>
+          <p className="text-text-secondary text-sm mt-1">Smart Lease & Loan Analysis</p>
+        </div>
 
-          {/* Right side - Login Form */}
-          <div
-            className="flex items-center justify-center animate-slide-in-right"
-            style={{ animationDelay: "0.2s" }}
-          >
-            <GlassCard className="w-full max-w-md p-8 rounded-3xl border border-white/20 shadow-2xl">
-              <div className="mb-8 text-center">
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-accent-blue to-accent-blue-light flex items-center justify-center mx-auto mb-4">
-                  <span className="text-3xl font-bold">⚡</span>
-                </div>
-                <h2 className="text-3xl font-bold text-text-primary mb-2">
-                  Sign In
-                </h2>
-                <p className="text-text-secondary">Welcome back to LEASIFY</p>
-              </div>
+        {/* Login Card */}
+        <div className="glass-card p-8 animate-fade-in">
+          <h2 className="text-xl font-bold text-text-primary mb-6 text-center">Sign In</h2>
+          {error && (
+            <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+              {error}
+            </div>
+          )}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="block text-text-secondary text-xs font-semibold mb-2 uppercase tracking-wider">Email</label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" className="w-full" />
+            </div>
+            <div>
+              <label className="block text-text-secondary text-xs font-semibold mb-2 uppercase tracking-wider">Password</label>
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full" />
+            </div>
+            <button type="submit" disabled={loading}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-accent-red to-accent-red-dark text-white font-semibold text-sm hover:shadow-glow-lg transition-all duration-300 disabled:opacity-50">
+              {loading ? "Signing in..." : "Sign In"}
+            </button>
+          </form>
+          <p className="text-text-secondary text-sm text-center mt-6">
+            Don't have an account? <Link to="/signup" className="text-accent-red-light font-semibold hover:underline">Create one</Link>
+          </p>
+        </div>
 
-              {error && (
-                <Alert
-                  type="error"
-                  title="Authentication Error"
-                  message={error}
-                  onClose={() => setError("")}
-                  className="mb-6"
-                />
-              )}
-
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <Input
-                  type="email"
-                  label="Email Address"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  icon={Mail}
-                  required
-                  disabled={loading}
-                />
-
-                <Input
-                  type="password"
-                  label="Password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  icon={Lock}
-                  required
-                  disabled={loading}
-                />
-
-                <div className="flex items-center justify-between pt-2">
-                  <label className="flex items-center gap-2 cursor-pointer group">
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 rounded bg-white/10 border border-white/20 accent-accent-blue cursor-pointer"
-                    />
-                    <span className="text-sm text-text-secondary group-hover:text-text-primary">
-                      Remember me
-                    </span>
-                  </label>
-                  <button
-                    type="button"
-                    className="text-sm text-accent-blue hover:text-accent-blue-light transition-colors"
-                  >
-                    Forgot password?
-                  </button>
-                </div>
-
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="lg"
-                  className="w-full"
-                  loading={loading}
-                  disabled={loading}
-                >
-                  {loading ? "Signing in..." : "Sign In"}
-                </Button>
-              </form>
-
-              <div className="mt-6 pt-6 border-t border-white/10 text-center">
-                <p className="text-text-secondary text-sm">
-                  Don't have an account?{" "}
-                  <button
-                    type="button"
-                    onClick={handleSignUp}
-                    className="font-semibold text-accent-blue hover:text-accent-blue-light transition-colors"
-                  >
-                    Create one
-                  </button>
-                </p>
-              </div>
-
-              {/* Social login (optional) */}
-              <div className="mt-6 pt-6 border-t border-white/10">
-                <p className="text-text-tertiary text-xs text-center mb-4">
-                  Or continue with
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <button className="glass-card py-2.5 px-4 rounded-lg hover:bg-white/12 transition-all duration-200 text-sm text-text-secondary hover:text-text-primary flex items-center justify-center gap-2">
-                    <span>Google</span>
-                  </button>
-                  <button className="glass-card py-2.5 px-4 rounded-lg hover:bg-white/12 transition-all duration-200 text-sm text-text-secondary hover:text-text-primary flex items-center justify-center gap-2">
-                    <span>Apple</span>
-                  </button>
-                </div>
-              </div>
-            </GlassCard>
+        {/* Sports Car Scene */}
+        <div className="flex justify-center mt-8">
+          <div className="login-race-scene">
+            <div className="race-horizon" />
+            <div className="race-track">
+              <div className="track-line track-line-1" />
+              <div className="track-line track-line-2" />
+              <div className="track-line track-line-3" />
+            </div>
+            <div className="sports-car-3d animate-sports-car-drive">
+              <div className="car-body-shell"><div className="car-cabin" /><div className="car-spoiler" /><div className="car-headlight" /></div>
+              <div className="car-wheel wheel-front" /><div className="car-wheel wheel-rear" />
+              <div className="car-shadow" />
+              <div className="car-smoke smoke-1" /><div className="car-smoke smoke-2" /><div className="car-smoke smoke-3" />
+            </div>
           </div>
         </div>
       </div>

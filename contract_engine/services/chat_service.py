@@ -16,27 +16,48 @@ OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
 
 
 def _build_negotiation_prompt(sla_data: Dict[str, str], user_message: str) -> str:
-    """Build an LLM prompt that includes contract details and the user's question.
-
-    The prompt instructs the model to act as a car-loan negotiation advisor and
-    respond with short, actionable advice the user can take to the dealer.
-    """
+    """Build an LLM prompt for either contract-aware or general automotive guidance."""
     apr = sla_data.get("apr", "N/A") or "N/A"
     loan_term = sla_data.get("loan_term", "N/A") or "N/A"
     monthly_payment = sla_data.get("monthly_payment", "N/A") or "N/A"
     total_payment = sla_data.get("total_payment", "N/A") or "N/A"
+    due_date = sla_data.get("due_date", "N/A") or "N/A"
+    lender = sla_data.get("lender_name", "N/A") or "N/A"
+    borrower = sla_data.get("borrower_name", "N/A") or "N/A"
+    vin = sla_data.get("vin", "N/A") or "N/A"
+    has_contract_context = bool(sla_data)
+
+    mode_instructions = (
+        "Mode: Contract-aware negotiation support. You have the customer's actual contract details. "
+        "Use these fields directly for personalized, specific recommendations."
+        if has_contract_context
+        else (
+            "Mode: General automotive assistant. No contract is loaded. "
+            "Answer using general industry knowledge, average pricing, and best practices."
+        )
+    )
+
+    context_block = (
+        "Current contract details:\n"
+        f"  APR: {apr}\n"
+        f"  Loan term: {loan_term}\n"
+        f"  Monthly payment: {monthly_payment}\n"
+        f"  Total payment: {total_payment}\n"
+        f"  Due date: {due_date}\n"
+        f"  Lender: {lender}\n"
+        f"  Borrower: {borrower}\n"
+        f"  VIN: {vin}\n\n"
+        if has_contract_context
+        else "No contract details provided.\n\n"
+    )
 
     return (
-        "You are an expert car loan negotiation advisor.\n\n"
-        "Contract details:\n"
-        f"APR: {apr}\n"
-        f"Loan term: {loan_term}\n"
-        f"Monthly payment: {monthly_payment}\n"
-        f"Total payment: {total_payment}\n\n"
-        "User question:\n"
+        "You are an expert car finance negotiation coach and automotive advisor.\n\n"
+        f"{mode_instructions}\n\n"
+        f"{context_block}"
+        "Customer question:\n"
         f"{user_message}\n\n"
-        "Provide short and practical negotiation advice that the user can use "
-        "when speaking with the dealer."
+        "Provide a helpful, friendly, and actionable response."
     )
 
 
@@ -58,13 +79,23 @@ def get_negotiation_advice(sla_data: Dict[str, str], user_message: str) -> str:
             {
                 "role": "system",
                 "content": (
-                    "You are a helpful car loan negotiation assistant. "
-                    "Always give concise, practical advice."
+                    "You are LEASIFY's built-in Car Finance Expert — a friendly, knowledgeable automotive "
+                    "negotiation coach. You speak directly to the customer like a trusted advisor at a dealership.\n\n"
+                    "Style guidelines:\n"
+                    "- Be warm, professional, and encouraging\n"
+                    "- Use clear, jargon-free language\n"
+                    "- Give specific, actionable advice with concrete numbers when possible\n"
+                    "- Structure responses with headings or bullet points for readability\n"
+                    "- If the customer has a contract loaded, reference their specific numbers\n"
+                    "- Suggest exact phrases they can say to the dealer\n"
+                    "- Always be on the customer's side\n"
+                    "- Keep responses concise but thorough (4-8 bullet points or 2-3 short paragraphs)"
                 ),
             },
             {"role": "user", "content": prompt},
         ],
-        "temperature": 0.7,
+        "temperature": 0.3,
+        "max_tokens": 800,
     }
 
     headers = {

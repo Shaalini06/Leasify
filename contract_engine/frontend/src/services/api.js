@@ -1,9 +1,8 @@
 import axios from "axios";
 
-// Use relative URLs so Vite's proxy forwards to the FastAPI backend during dev.
-// In production, set VITE_API_BASE to the deployed backend URL.
+// All API calls go through /api prefix which Vite proxies to FastAPI backend.
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE || "",
+  baseURL: import.meta.env.VITE_API_BASE || "/api",
   headers: { "Content-Type": "application/json" },
 });
 
@@ -72,7 +71,6 @@ export async function getAnalysis(documentId) {
     analysisResult = await analyzeContract(documentId);
   } catch (error) {
     const statusCode = error?.response?.status;
-    // Missing VIN or market data should not block showing extracted SLA.
     if (statusCode !== 400 && statusCode !== 404) {
       throw error;
     }
@@ -98,10 +96,12 @@ export async function generateRiskReport(documentId) {
 
 // CHAT SERVICES
 export async function chatWithAssistant(message, documentId) {
-  const { data } = await api.post("/negotiation-assistant", {
-    message,
-    document_id: documentId,
-  });
+  const payload = { message };
+  if (documentId !== null && documentId !== undefined && String(documentId).trim() !== "") {
+    payload.document_id = Number(documentId);
+  }
+
+  const { data } = await api.post("/negotiation-assistant", payload);
   return data;
 }
 
@@ -118,6 +118,18 @@ export async function generatePDFReport(documentId) {
   return data;
 }
 
+export async function downloadPDFReport(documentId, filename) {
+  const blob = await generatePDFReport(documentId);
+  const url = window.URL.createObjectURL(new Blob([blob]));
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", `LEASIFY_Report_${filename || documentId}.pdf`);
+  document.body.appendChild(link);
+  link.click();
+  link.parentNode.removeChild(link);
+  window.URL.revokeObjectURL(url);
+}
+
 export async function generateCSVReport(documentId) {
   const { data } = await api.get(`/report/csv/${documentId}`, {
     responseType: "blob",
@@ -130,7 +142,7 @@ export async function getReportData(documentId) {
   return data;
 }
 
-// AUTH SERVICES (if backend supports)
+// AUTH SERVICES
 export async function signup(email, password, fullName) {
   const { data } = await api.post("/auth/signup", {
     email,

@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from database import Base
@@ -20,6 +20,8 @@ class ContractDocument(Base):
 
     # One document can have one SLA extraction record.
     sla_result = relationship("SLAExtraction", back_populates="document", uselist=False)
+    # One document can have one persisted analysis/report record.
+    analysis_report = relationship("AnalysisReport", back_populates="document", uselist=False)
 
 
 class SLAExtraction(Base):
@@ -46,3 +48,21 @@ class UserAccount(Base):
     email = Column(String(255), nullable=False, unique=True, index=True)
     password_hash = Column(String(512), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class AnalysisReport(Base):
+    """Stores persisted analysis/report output for a contract document."""
+
+    __tablename__ = "analysis_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(Integer, ForeignKey("contract_documents.id"), nullable=False, unique=True)
+    user_id = Column(Integer, ForeignKey("user_accounts.id"), nullable=True)
+    report_json = Column(JSON, nullable=False)
+    contract_text = Column(Text, nullable=True)
+    pdf_path = Column(String(512), nullable=True)
+    fairness_score = Column(Float, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    document = relationship("ContractDocument", back_populates="analysis_report")

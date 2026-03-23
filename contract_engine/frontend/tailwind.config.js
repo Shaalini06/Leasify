@@ -4,17 +4,30 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Primary Background
-        "bg-primary": "#0f1419",
-        "bg-secondary": "#1a1f2e",
-        "bg-tertiary": "#232a3a",
+        // Primary Background — deep dark for premium feel
+        "bg-primary": "#0a0a0f",
+        "bg-secondary": "#111118",
+        "bg-tertiary": "#1a1a24",
 
-        // Accent Colors
-        "accent-blue": "#3b82f6",
-        "accent-blue-dark": "#1e40af",
-        "accent-blue-light": "#60a5fa",
-        "accent-orange": "#f97316",
-        "accent-orange-light": "#fb923c",
+        // RED Accent Palette
+        "accent-red": "#dc2626",
+        "accent-red-dark": "#991b1b",
+        "accent-red-light": "#f87171",
+        "accent-red-glow": "#ef4444",
+
+        // Gold Accent (secondary)
+        "accent-gold": "#f59e0b",
+        "accent-gold-light": "#fbbf24",
+
+        // Neon accent for glows
+        "accent-neon": "#ff3b3b",
+
+        // Legacy aliases for gradual migration
+        "accent-blue": "#dc2626",
+        "accent-blue-dark": "#991b1b",
+        "accent-blue-light": "#f87171",
+        "accent-orange": "#f59e0b",
+        "accent-orange-light": "#fbbf24",
 
         // Text Colors
         "text-primary": "#f5f5f5",
@@ -27,22 +40,21 @@ export default {
       },
       fontFamily: {
         sans: [
+          '"Inter"',
+          '"Outfit"',
           "-apple-system",
           "BlinkMacSystemFont",
           '"Segoe UI"',
           '"Roboto"',
-          '"Oxygen"',
-          '"Ubuntu"',
-          '"Cantarell"',
-          '"Fira Sans"',
-          '"Droid Sans"',
-          '"Helvetica Neue"',
           "sans-serif",
         ],
       },
       boxShadow: {
-        glow: "0 0 20px rgba(59, 130, 246, 0.3)",
-        "glow-lg": "0 0 40px rgba(59, 130, 246, 0.5)",
+        glow: "0 0 20px rgba(220, 38, 38, 0.3)",
+        "glow-lg": "0 0 40px rgba(220, 38, 38, 0.5)",
+        "glow-red": "0 0 30px rgba(239, 68, 68, 0.4)",
+        "glow-gold": "0 0 20px rgba(245, 158, 11, 0.3)",
+        neon: "0 0 15px rgba(255, 59, 59, 0.5), 0 0 45px rgba(255, 59, 59, 0.2)",
       },
       animation: {
         "fade-in": "fadeIn 0.6s ease-out forwards",
@@ -56,6 +68,8 @@ export default {
         "spin-slow": "spin-slow 20s linear infinite",
         "car-float": "carFloat 3s ease-in-out infinite",
         "car-move": "carMove 8s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite",
+        "neon-pulse": "neonPulse 2s ease-in-out infinite",
+        shimmer: "shimmer 2s ease-in-out infinite",
       },
       keyframes: {
         fadeIn: {
@@ -75,8 +89,8 @@ export default {
           to: { opacity: "1", transform: "translateX(0)" },
         },
         glow: {
-          "0%, 100%": { boxShadow: "0 0 20px rgba(59, 130, 246, 0.3)" },
-          "50%": { boxShadow: "0 0 30px rgba(59, 130, 246, 0.5)" },
+          "0%, 100%": { boxShadow: "0 0 20px rgba(220, 38, 38, 0.3)" },
+          "50%": { boxShadow: "0 0 30px rgba(220, 38, 38, 0.5)" },
         },
         "pulse-slow": {
           "0%, 100%": { opacity: "1" },
@@ -93,6 +107,20 @@ export default {
         carMove: {
           from: { transform: "translateX(-100%)" },
           to: { transform: "translateX(100vw)" },
+        },
+        neonPulse: {
+          "0%, 100%": {
+            boxShadow:
+              "0 0 5px rgba(255, 59, 59, 0.4), 0 0 20px rgba(255, 59, 59, 0.2)",
+          },
+          "50%": {
+            boxShadow:
+              "0 0 10px rgba(255, 59, 59, 0.6), 0 0 40px rgba(255, 59, 59, 0.3)",
+          },
+        },
+        shimmer: {
+          "0%": { backgroundPosition: "-200% 0" },
+          "100%": { backgroundPosition: "200% 0" },
         },
       },
     },
