@@ -565,12 +565,12 @@ export default function UploadContractPage() {
                             {issueItems.map((issue, index) => (
                               <div key={`${issue}-${index}`} className="clause-bad p-3 flex items-center gap-3">
                                 <span className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0" />
-                                <span className="text-sm">{issue}</span>
+                                <span className="text-sm text-wrap">{issue}</span>
                               </div>
                             ))}
                           </div>
                         ) : (
-                          <p className="text-sm text-green-400">✓ No major risks detected.</p>
+                          <p className="text-sm text-green-400 text-wrap">✓ No major risks detected.</p>
                         )}
                       </GlassCard>
 
@@ -584,12 +584,12 @@ export default function UploadContractPage() {
                             {goodClauseItems.map((clause, index) => (
                               <div key={`${clause}-${index}`} className="clause-good p-3 flex items-center gap-3">
                                 <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
-                                <span className="text-sm">{clause}</span>
+                                <span className="text-sm text-wrap">{clause}</span>
                               </div>
                             ))}
                           </div>
                         ) : (
-                          <p className="text-sm text-text-secondary">No specific positives highlighted.</p>
+                          <p className="text-sm text-text-secondary text-wrap">No specific positives highlighted.</p>
                         )}
                       </GlassCard>
 
@@ -676,12 +676,12 @@ export default function UploadContractPage() {
                           <ol className="space-y-2">
                             {suggestionItems.map((item, index) => (
                               <li key={`${item}-${index}`} className="text-sm text-text-secondary flex gap-2">
-                                <span className="text-accent-gold font-bold flex-shrink-0">{index + 1}.</span> {item}
+                                <span className="text-accent-gold font-bold flex-shrink-0">{index + 1}.</span> <span className="text-wrap">{item}</span>
                               </li>
                             ))}
                           </ol>
                         ) : (
-                          <p className="text-sm text-text-secondary">Suggestions will appear after analysis.</p>
+                          <p className="text-sm text-text-secondary text-wrap">Suggestions will appear after analysis.</p>
                         )}
                       </GlassCard>
 
@@ -691,7 +691,7 @@ export default function UploadContractPage() {
                           <h4 className="text-base font-semibold text-text-primary mb-3">Detailed Findings</h4>
                           <ul className="space-y-2">
                             {detailedFindingItems.map((finding, index) => (
-                              <li key={`${finding}-${index}`} className="text-sm text-text-secondary">• {finding}</li>
+                              <li key={`${finding}-${index}`} className="text-sm text-text-secondary text-wrap">• {finding}</li>
                             ))}
                           </ul>
                         </GlassCard>

@@ -119,15 +119,20 @@ export async function generatePDFReport(documentId) {
 }
 
 export async function downloadPDFReport(documentId, filename) {
-  const blob = await generatePDFReport(documentId);
-  const url = window.URL.createObjectURL(new Blob([blob]));
-  const link = document.createElement("a");
-  link.href = url;
-  link.setAttribute("download", `LEASIFY_Report_${filename || documentId}.pdf`);
-  document.body.appendChild(link);
-  link.click();
-  link.parentNode.removeChild(link);
-  window.URL.revokeObjectURL(url);
+  try {
+    const blob = await generatePDFReport(documentId);
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `LEASIFY_Report_${filename || documentId}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error("PDF download failed:", error);
+    throw new Error("Failed to download PDF report. Please try again.");
+  }
 }
 
 export async function generateCSVReport(documentId) {

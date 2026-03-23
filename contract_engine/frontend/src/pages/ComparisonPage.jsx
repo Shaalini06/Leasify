@@ -138,7 +138,7 @@ export default function ComparisonPage() {
                             <span className="text-white text-sm">✓</span>
                           </div>
                         )}
-                        <h3 className="font-semibold text-text-primary mb-3">{contract.filename || "Contract"}</h3>
+                        <h3 className="font-semibold text-text-primary mb-3 text-wrap">{contract.filename || "Contract"}</h3>
                         <div className="space-y-2 text-sm">
                           <div className="flex justify-between"><span className="text-text-tertiary">APR</span><span className="font-semibold text-text-primary">{parseNumber(contract.sla?.apr) || "—"}%</span></div>
                           <div className="flex justify-between"><span className="text-text-tertiary">Monthly</span><span className="font-semibold text-text-primary">${parseNumber(contract.sla?.monthly_payment) || "—"}</span></div>

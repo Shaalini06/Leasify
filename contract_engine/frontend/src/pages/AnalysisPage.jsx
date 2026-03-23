@@ -335,12 +335,12 @@ export default function AnalysisPage() {
             <GlassCard className="mb-8 p-6" hover={false}>
               <h3 className="text-lg font-semibold text-text-primary mb-3">Analysis Verdict</h3>
               {analysis?.verdict && (
-                <p className="text-text-secondary text-sm mb-3">
+                <p className="text-text-secondary text-sm mb-3 text-wrap">
                   {analysis.verdict}
                 </p>
               )}
               {analysis?.summary_paragraph && (
-                <p className="text-text-primary text-sm leading-relaxed">
+                <p className="text-text-primary text-sm leading-relaxed text-wrap">
                   {analysis.summary_paragraph}
                 </p>
               )}
@@ -374,7 +374,7 @@ export default function AnalysisPage() {
               </div>
               <div className="space-y-3">
                 {issues.length > 0 ? issues.map((issue, index) => (
-                  <div key={`${issue}-${index}`} className="p-3 rounded-lg bg-white/5 border border-white/10 text-sm text-text-secondary">
+                  <div key={`${issue}-${index}`} className="p-3 rounded-lg bg-white/5 border border-white/10 text-sm text-text-secondary text-wrap">
                     {issue}
                   </div>
                 )) : (
@@ -489,7 +489,7 @@ export default function AnalysisPage() {
               {suggestions.length > 0 ? suggestions.map((item, index) => (
                 <SuggestionItem key={`${item}-${index}`} text={item} />
               )) : (
-                <p className="text-text-secondary text-sm">No suggestions available yet.</p>
+                <p className="text-text-secondary text-sm text-wrap">No suggestions available yet.</p>
               )}
             </div>
 
@@ -527,7 +527,7 @@ function SuggestionItem({ text }) {
   return (
     <div className="flex gap-3 p-3 rounded-lg bg-accent-red/10 border border-accent-red/30">
       <span className="text-accent-red-light font-bold flex-shrink-0 text-lg">✓</span>
-      <span className="text-text-secondary text-sm">{text}</span>
+      <span className="text-text-secondary text-sm text-wrap">{text}</span>
     </div>
   );
 }

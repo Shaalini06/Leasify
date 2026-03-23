@@ -530,13 +530,13 @@ def analyze_contract_terms(
         issues.append(
             f"High APR of {apr_value:.2f}% (above 7% benchmark; typical new-car APR is often ~5-6%)"
         )
-        negotiation_suggestions.append(f"Negotiate an APR <= 6% (current extracted APR is {apr_value:.2f}%).")
+        negotiation_suggestions.append(f"Your APR is sitting at {apr_value:.2f}%. See if they'll come down closer to 6%—most dealers can work with that.")
 
     # Rule 2: Long loan duration
     if loan_term_months is not None and loan_term_months > 72:
         issues.append(f"Long loan term of {loan_term_months:.0f} months (above 72-month benchmark)")
         negotiation_suggestions.append(
-            "Request a shorter term (<=72 months) or compare total interest savings vs your current term."
+            f"That's a pretty long loan term at {loan_term_months:.0f} months. See if shortening it to 60-72 months saves you meaningful interest."
         )
 
     # Rule 3: Monthly payment too high relative to market price
@@ -552,7 +552,7 @@ def analyze_contract_terms(
             f": ${monthly_payment:.0f} vs market benchmark (~${market_payment_benchmark:.0f}/mo at 3% of market)"
         )
         negotiation_suggestions.append(
-            "Ask for a lower monthly payment by adjusting APR and/or term, and confirm the financed amount/out-the-door price."
+            f"Your monthly payment looks a bit high at ${monthly_payment:.0f}. Try adjusting the APR or term—or see if there's room to bring down the financed amount."
         )
 
     # Rule 4: Contract price is more than 10% above estimated market price
@@ -568,14 +568,14 @@ def analyze_contract_terms(
             f"Vehicle price appears high: ${contract_price:.0f} vs est. market ${estimated_market_price:.0f} (~{over_pct:.0f}% above market)"
         )
         negotiation_suggestions.append(
-            f"Negotiate purchase price down by roughly ${diff:.0f} toward the estimated market value (or match a comparable trim)."
+            f"The car's priced about ${diff:.0f} above market. Worth a conversation with the dealer about bringing it closer to that estimated value."
         )
 
     # Rule 5: Missing SLA fields warning (affects scoring accuracy)
     if missing_fields:
         issues.append(f"Missing SLA fields detected: {', '.join(missing_fields)}")
         negotiation_suggestions.append(
-            "Request the missing SLA details from the dealer and re-review the report once the missing fields are filled in."
+            "A few details are missing from your contract—get those from the dealer so we can give you a more complete picture."
         )
 
     # Rule 6: Total financing cost seems high relative to vehicle price
@@ -591,7 +591,7 @@ def analyze_contract_terms(
                 f"Total financing cost is high: total payment ${total_payment:.0f} vs vehicle price ${contract_price:.0f} (≈{total_cost_ratio*100:.0f}% of price)"
             )
             negotiation_suggestions.append(
-                "Ask for a finance-charge breakdown (interest + fees) and request options to reduce total cost (lower APR, shorter term, or larger down payment)."
+                "You're spending a fair bit on interest and fees overall. Ask for the breakdown and explore options like a higher down payment or shorter loan period to cut costs."
             )
 
     # Rule 7: Payment-to-income ratio guidance (best-effort)
@@ -609,7 +609,7 @@ def analyze_contract_terms(
                 f"Payment-to-income looks high: payment ${monthly_payment:.0f}/mo vs estimated income ${estimated_monthly_income:.0f}/mo (ratio {payment_to_income:.2f}; benchmark <= 0.36)"
             )
             negotiation_suggestions.append(
-                "Request payment relief: lower APR, reduce financed amount (down payment), or choose a term that brings the monthly payment closer to affordability guidelines."
+                "That monthly payment takes up a chunk of your income. Try tweaking the APR, term, or getting a bigger down payment to make it more comfortable."
             )
 
     # Rule 8: Penalties or hidden fee clauses exist
@@ -617,7 +617,7 @@ def analyze_contract_terms(
     if penalty_keywords:
         issues.append(f"Potential penalty/fee language found: {', '.join(penalty_keywords)}")
         negotiation_suggestions.append(
-            "Ask for a full fee schedule and to remove/soften penalty clauses or hidden fees; confirm any prepayment, late-payment, or default terms."
+            "There's some penalty or fee language in here. Get a full fee breakdown and see if you can soften those clauses or remove them entirely."
         )
 
     # Detect positive aspects

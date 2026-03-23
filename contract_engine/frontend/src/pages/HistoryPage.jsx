@@ -196,7 +196,7 @@ export default function HistoryPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-4 mb-3">
-                        <h3 className="font-semibold text-text-primary text-lg">{contract.filename || "Lease Agreement"}</h3>
+                        <h3 className="font-semibold text-text-primary text-lg text-wrap">{contract.filename || "Lease Agreement"}</h3>
                         <span className={`text-xs font-semibold px-3 py-1 rounded-full border ${
                           contract.analyzed
                             ? "bg-green-500/10 text-green-400 border-green-500/30"
