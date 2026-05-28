@@ -6,10 +6,8 @@ from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session
 
 from database import get_db
-from models import AnalysisReport, ContractDocument, SLAExtraction
 from services.analysis_service import build_detailed_report
 
 router = APIRouter(tags=["Reports"])
@@ -173,36 +171,36 @@ def _generate_pdf(document_id: int, filename: str, sla_data: dict, report_data: 
 
 
 @router.get("/report/{document_id}")
-def get_report(document_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
+def get_report(document_id: int, db: Any = Depends(get_db)) -> Dict[str, Any]:
     """Return JSON report data for a contract."""
-    report = db.query(AnalysisReport).filter(AnalysisReport.document_id == document_id).first()
+    report = db["analysis_reports"].find_one({"document_id": document_id})
     if not report:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found.")
 
-    document = db.query(ContractDocument).filter(ContractDocument.id == document_id).first()
-    sla_record = db.query(SLAExtraction).filter(SLAExtraction.document_id == document_id).first()
+    document = db["contract_documents"].find_one({"id": document_id})
+    sla_record = db["sla_extractions"].find_one({"document_id": document_id})
 
     return {
         "document_id": document_id,
-        "filename": document.filename if document else "Unknown",
-        "sla_data": sla_record.extracted_json if sla_record and isinstance(sla_record.extracted_json, dict) else {},
-        "report": report.report_json if isinstance(report.report_json, dict) else {},
-        "pdf_path": report.pdf_path,
+        "filename": document["filename"] if document else "Unknown",
+        "sla_data": sla_record.get("extracted_json") if sla_record and isinstance(sla_record.get("extracted_json"), dict) else {},
+        "report": report.get("report_json") if isinstance(report.get("report_json"), dict) else {},
+        "pdf_path": report.get("pdf_path"),
     }
 
 
 @router.get("/report/pdf/{document_id}")
-def generate_pdf_report(document_id: int, db: Session = Depends(get_db)):
+def generate_pdf_report(document_id: int, db: Any = Depends(get_db)):
     """Generate and return a PDF report for the given document."""
-    document = db.query(ContractDocument).filter(ContractDocument.id == document_id).first()
+    document = db["contract_documents"].find_one({"id": document_id})
     if not document:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found.")
 
-    sla_record = db.query(SLAExtraction).filter(SLAExtraction.document_id == document_id).first()
-    sla_data = sla_record.extracted_json if sla_record and isinstance(sla_record.extracted_json, dict) else {}
+    sla_record = db["sla_extractions"].find_one({"document_id": document_id})
+    sla_data = sla_record.get("extracted_json") if sla_record and isinstance(sla_record.get("extracted_json"), dict) else {}
 
-    report = db.query(AnalysisReport).filter(AnalysisReport.document_id == document_id).first()
-    report_data = report.report_json if report and isinstance(report.report_json, dict) else {}
+    report = db["analysis_reports"].find_one({"document_id": document_id})
+    report_data = report.get("report_json") if report and isinstance(report.get("report_json"), dict) else {}
 
     # If no report exists, build a basic one from SLA
     if not report_data and sla_data:
@@ -214,18 +212,16 @@ def generate_pdf_report(document_id: int, db: Session = Depends(get_db)):
         )
 
     try:
-        pdf_path = _generate_pdf(document_id, document.filename, sla_data, report_data)
+        pdf_path = _generate_pdf(document_id, document["filename"], sla_data, report_data)
 
         # Save pdf_path to DB
         if report:
-            report.pdf_path = pdf_path
-            db.add(report)
-            db.commit()
+            db["analysis_reports"].update_one({"document_id": document_id}, {"$set": {"pdf_path": pdf_path}})
 
         return FileResponse(
             pdf_path,
             media_type="application/pdf",
-            filename=f"LEASIFY_Report_{document.filename.rsplit('.', 1)[0]}.pdf",
+            filename=f"LEASIFY_Report_{document['filename'].rsplit('.', 1)[0]}.pdf",
         )
     except Exception as error:
         logger.exception("PDF generation failed for document_id=%s", document_id)

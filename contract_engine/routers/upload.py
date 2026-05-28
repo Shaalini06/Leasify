@@ -1,13 +1,13 @@
 """Router for contract upload and OCR extraction."""
 
 import logging
+from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.concurrency import run_in_threadpool
-from sqlalchemy.orm import Session
 
-from database import get_db
-from models import ContractDocument
+from database import get_db, get_next_sequence
 from schemas import UploadContractResponse
 from services.ocr_service import extract_text_from_upload, validate_upload_file
 
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.post("/upload-contract", response_model=UploadContractResponse)
-async def upload_contract(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_contract(file: UploadFile = File(...), db: Any = Depends(get_db)):
     """Upload a contract file, run OCR, store text, and return extraction output."""
     try:
         # Validate file type early to avoid expensive OCR work on unsupported files.
@@ -31,16 +31,19 @@ async def upload_contract(file: UploadFile = File(...), db: Session = Depends(ge
         extracted_text = await run_in_threadpool(extract_text_from_upload, file_bytes, file.filename)
 
         # Persist OCR results for downstream SLA extraction.
-        document = ContractDocument(filename=file.filename or "unknown", extracted_text=extracted_text)
-        db.add(document)
-        db.commit()
-        db.refresh(document)
+        document = {
+            "id": get_next_sequence(db, "contract_documents"),
+            "filename": file.filename or "unknown",
+            "extracted_text": extracted_text,
+            "upload_timestamp": datetime.utcnow(),
+        }
+        db["contract_documents"].insert_one(document)
 
         return UploadContractResponse(
-            document_id=document.id,
-            filename=document.filename,
-            extracted_text=document.extracted_text,
-            upload_timestamp=document.upload_timestamp,
+            document_id=document["id"],
+            filename=document["filename"],
+            extracted_text=document["extracted_text"],
+            upload_timestamp=document["upload_timestamp"],
         )
     except ValueError as error:
         logger.error("Upload validation/processing error: %s", error)

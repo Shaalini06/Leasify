@@ -2,15 +2,13 @@
 
 import logging
 import re
+from datetime import datetime
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.concurrency import run_in_threadpool
-from sqlalchemy.orm import Session
 
-from database import get_db
-from database import ensure_analysis_reports_schema
-from models import AnalysisReport, ContractDocument, SLAExtraction
+from database import get_db, get_next_sequence
 from services.analysis_service import analyze_contract_terms, build_market_fallback, fetch_vehicle_market_data
 from services.vin_service import get_vehicle_details
 
@@ -19,26 +17,23 @@ logger = logging.getLogger(__name__)
 
 
 @router.post("/analyze-contract/{document_id}")
-async def analyze_contract(document_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
+async def analyze_contract(document_id: int, db: Any = Depends(get_db)) -> Dict[str, Any]:
     """Analyze SLA and vehicle data for financing risk and negotiation opportunities."""
     try:
-        # Repair SQLite schema if the table is missing recently-added columns.
-        ensure_analysis_reports_schema()
-
         # Step 1: Ensure the source document exists.
-        document = db.query(ContractDocument).filter(ContractDocument.id == document_id).first()
+        document = db["contract_documents"].find_one({"id": document_id})
         if not document:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found.")
 
         # Step 2: Fetch extracted SLA JSON for the document.
-        sla_record = db.query(SLAExtraction).filter(SLAExtraction.document_id == document_id).first()
-        if not sla_record or not isinstance(sla_record.extracted_json, dict):
+        sla_record = db["sla_extractions"].find_one({"document_id": document_id})
+        if not sla_record or not isinstance(sla_record.get("extracted_json"), dict):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="SLA data not found. Please run SLA extraction first.",
             )
 
-        sla_data: Dict[str, Any] = sla_record.extracted_json
+        sla_data: Dict[str, Any] = sla_record["extracted_json"]
 
         # Step 3: VIN is optional for baseline analysis; vehicle decode is best-effort.
         raw_vin = str(sla_data.get("vin", "") or "").strip()
@@ -115,21 +110,40 @@ async def analyze_contract(document_id: int, db: Session = Depends(get_db)) -> D
         result["sla_data"] = sla_data
 
         # Persist latest analysis/report output so history can read from DB directly.
-        existing_report = db.query(AnalysisReport).filter(AnalysisReport.document_id == document_id).first()
+        reports = db["analysis_reports"]
+        existing_report = reports.find_one({"document_id": document_id})
+        timestamp = datetime.utcnow()
         if existing_report:
-            existing_report.report_json = result
-            existing_report.contract_text = document.extracted_text or ""
-            existing_report.fairness_score = result.get("deal_score")
-            db.add(existing_report)
+            reports.update_one(
+                {"document_id": document_id},
+                {
+                    "$set": {
+                        "id": existing_report.get("id", document_id),
+                        "document_id": document_id,
+                        "user_id": existing_report.get("user_id"),
+                        "report_json": result,
+                        "contract_text": document.get("extracted_text") or "",
+                        "pdf_path": existing_report.get("pdf_path"),
+                        "fairness_score": result.get("deal_score"),
+                        "created_at": existing_report.get("created_at", timestamp),
+                        "updated_at": timestamp,
+                    }
+                },
+            )
         else:
-            db.add(AnalysisReport(
-                document_id=document_id,
-                report_json=result,
-                contract_text=document.extracted_text or "",
-                fairness_score=result.get("deal_score"),
-            ))
-
-        db.commit()
+            reports.insert_one(
+                {
+                    "id": get_next_sequence(db, "analysis_reports"),
+                    "document_id": document_id,
+                    "user_id": None,
+                    "report_json": result,
+                    "contract_text": document.get("extracted_text") or "",
+                    "pdf_path": None,
+                    "fairness_score": result.get("deal_score"),
+                    "created_at": timestamp,
+                    "updated_at": timestamp,
+                }
+            )
 
         return result
     except HTTPException:

@@ -2,14 +2,13 @@
 
 import logging
 from typing import Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
 
 from database import get_db
-from models import SLAExtraction
 from services.chat_service import get_negotiation_advice
 
 router = APIRouter(tags=["Negotiation Assistant"])
@@ -35,23 +34,19 @@ class ChatResponse(BaseModel):
 # ── Endpoint ──────────────────────────────────────────────────────────────
 
 @router.post("/negotiation-assistant", response_model=ChatResponse)
-async def negotiation_assistant(body: ChatRequest, db: Session = Depends(get_db)):
+async def negotiation_assistant(body: ChatRequest, db: Any = Depends(get_db)):
     """Accept a user question and return AI advice with optional contract context."""
     try:
         # Step 1: Use SLA context only when a contract is explicitly provided.
         sla_data: dict = {}
         if body.document_id is not None:
-            sla_record = (
-                db.query(SLAExtraction)
-                .filter(SLAExtraction.document_id == body.document_id)
-                .first()
-            )
-            if not sla_record or not isinstance(sla_record.extracted_json, dict):
+            sla_record = db["sla_extractions"].find_one({"document_id": body.document_id})
+            if not sla_record or not isinstance(sla_record.get("extracted_json"), dict):
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Contract SLA data not found. Please extract SLA first.",
                 )
-            sla_data = sla_record.extracted_json
+            sla_data = sla_record["extracted_json"]
 
         # Step 2: Call LLM in a threadpool (requests is synchronous).
         reply = await run_in_threadpool(get_negotiation_advice, sla_data, body.message)

@@ -1,68 +1,45 @@
-"""SQLAlchemy database models for documents and SLA extraction results."""
+"""Lightweight record shapes used by the MongoDB-backed API."""
 
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from datetime import datetime
-
-from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, Integer, String, Text
-from sqlalchemy.orm import relationship
-
-from database import Base
+from typing import Any, Dict
 
 
-class ContractDocument(Base):
-    """Stores uploaded contract metadata and OCR text content."""
-
-    __tablename__ = "contract_documents"
-
-    id = Column(Integer, primary_key=True, index=True)
-    filename = Column(String(255), nullable=False)
-    extracted_text = Column(Text, nullable=False)
-    upload_timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
-
-    # One document can have one SLA extraction record.
-    sla_result = relationship("SLAExtraction", back_populates="document", uselist=False)
-    # One document can have one persisted analysis/report record.
-    analysis_report = relationship("AnalysisReport", back_populates="document", uselist=False)
+@dataclass
+class ContractDocument:
+    id: int | None = None
+    filename: str = ""
+    extracted_text: str = ""
+    upload_timestamp: datetime = field(default_factory=datetime.utcnow)
 
 
-class SLAExtraction(Base):
-    """Stores normalized SLA fields extracted by the LLM."""
-
-    __tablename__ = "sla_extractions"
-
-    id = Column(Integer, primary_key=True, index=True)
-    document_id = Column(Integer, ForeignKey("contract_documents.id"), nullable=False, unique=True)
-    extracted_json = Column(JSON, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-
-    # Back-reference to the source contract document.
-    document = relationship("ContractDocument", back_populates="sla_result")
+@dataclass
+class SLAExtraction:
+    id: int | None = None
+    document_id: int = 0
+    extracted_json: Dict[str, Any] = field(default_factory=dict)
+    created_at: datetime = field(default_factory=datetime.utcnow)
 
 
-class UserAccount(Base):
-    """Stores basic user credentials for frontend authentication flows."""
-
-    __tablename__ = "user_accounts"
-
-    id = Column(Integer, primary_key=True, index=True)
-    full_name = Column(String(255), nullable=False)
-    email = Column(String(255), nullable=False, unique=True, index=True)
-    password_hash = Column(String(512), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+@dataclass
+class UserAccount:
+    id: int | None = None
+    full_name: str = ""
+    email: str = ""
+    password_hash: str = ""
+    created_at: datetime = field(default_factory=datetime.utcnow)
 
 
-class AnalysisReport(Base):
-    """Stores persisted analysis/report output for a contract document."""
-
-    __tablename__ = "analysis_reports"
-
-    id = Column(Integer, primary_key=True, index=True)
-    document_id = Column(Integer, ForeignKey("contract_documents.id"), nullable=False, unique=True)
-    user_id = Column(Integer, ForeignKey("user_accounts.id"), nullable=True)
-    report_json = Column(JSON, nullable=False)
-    contract_text = Column(Text, nullable=True)
-    pdf_path = Column(String(512), nullable=True)
-    fairness_score = Column(Float, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-
-    document = relationship("ContractDocument", back_populates="analysis_report")
+@dataclass
+class AnalysisReport:
+    id: int | None = None
+    document_id: int = 0
+    user_id: int | None = None
+    report_json: Dict[str, Any] = field(default_factory=dict)
+    contract_text: str | None = None
+    pdf_path: str | None = None
+    fairness_score: float | None = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)

@@ -5,12 +5,12 @@ import hashlib
 import hmac
 import os
 import time
+from datetime import datetime
+from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
-from sqlalchemy.orm import Session
 
-from database import get_db
-from models import UserAccount
+from database import get_db, get_next_sequence
 from schemas import AuthResponse, AuthUser, LoginRequest, SignupRequest, VerifyTokenResponse
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -91,23 +91,23 @@ def _extract_bearer_token(authorization: str | None) -> str:
     return token.strip()
 
 
-def _serialize_user(user: UserAccount) -> AuthUser:
-    """Convert SQLAlchemy user model to API-safe user payload."""
-    return AuthUser(id=user.id, email=user.email, full_name=user.full_name)
+def _serialize_user(user: Dict[str, Any]) -> AuthUser:
+    """Convert a MongoDB user document to API-safe user payload."""
+    return AuthUser(id=int(user["id"]), email=user["email"], full_name=user["full_name"])
 
 
-def _get_user_from_auth_header(authorization: str | None, db: Session) -> UserAccount:
+def _get_user_from_auth_header(authorization: str | None, db: Any) -> Dict[str, Any]:
     """Resolve the current user from Authorization header token."""
     token = _extract_bearer_token(authorization)
     user_id = _decode_token(token)
-    user = db.query(UserAccount).filter(UserAccount.id == user_id).first()
+    user = db["user_accounts"].find_one({"id": user_id})
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found for token.")
     return user
 
 
 @router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
-def signup(body: SignupRequest, db: Session = Depends(get_db)) -> AuthResponse:
+def signup(body: SignupRequest, db: Any = Depends(get_db)) -> AuthResponse:
     """Create a new account and issue an auth token."""
     email = body.email.strip().lower()
     full_name = body.full_name.strip()
@@ -115,35 +115,40 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)) -> AuthResponse:
     if not email or not full_name:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email and full name are required.")
 
-    existing = db.query(UserAccount).filter(UserAccount.email == email).first()
+    users = db["user_accounts"]
+    existing = users.find_one({"email": email})
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="An account with this email already exists.",
         )
 
-    user = UserAccount(email=email, full_name=full_name, password_hash=_hash_password(body.password))
-    db.add(user)
-    db.commit()
-    db.refresh(user)
+    user = {
+        "id": get_next_sequence(db, "user_accounts"),
+        "email": email,
+        "full_name": full_name,
+        "password_hash": _hash_password(body.password),
+        "created_at": datetime.utcnow(),
+    }
+    users.insert_one(user)
 
-    return AuthResponse(token=_create_token(user.id), user=_serialize_user(user))
+    return AuthResponse(token=_create_token(user["id"]), user=_serialize_user(user))
 
 
 @router.post("/login", response_model=AuthResponse)
-def login(body: LoginRequest, db: Session = Depends(get_db)) -> AuthResponse:
+def login(body: LoginRequest, db: Any = Depends(get_db)) -> AuthResponse:
     """Authenticate a user and issue a fresh auth token."""
     email = body.email.strip().lower()
-    user = db.query(UserAccount).filter(UserAccount.email == email).first()
+    user = db["user_accounts"].find_one({"email": email})
 
-    if not user or not _verify_password(body.password, user.password_hash):
+    if not user or not _verify_password(body.password, user["password_hash"]):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
 
-    return AuthResponse(token=_create_token(user.id), user=_serialize_user(user))
+    return AuthResponse(token=_create_token(user["id"]), user=_serialize_user(user))
 
 
 @router.get("/me", response_model=AuthUser)
-def me(authorization: str | None = Header(default=None), db: Session = Depends(get_db)) -> AuthUser:
+def me(authorization: str | None = Header(default=None), db: Any = Depends(get_db)) -> AuthUser:
     """Return the currently authenticated user."""
     user = _get_user_from_auth_header(authorization, db)
     return _serialize_user(user)
@@ -152,7 +157,7 @@ def me(authorization: str | None = Header(default=None), db: Session = Depends(g
 @router.get("/verify", response_model=VerifyTokenResponse)
 def verify_token(
     authorization: str | None = Header(default=None),
-    db: Session = Depends(get_db),
+    db: Any = Depends(get_db),
 ) -> VerifyTokenResponse:
     """Validate the bearer token and return the linked user."""
     user = _get_user_from_auth_header(authorization, db)

@@ -8,56 +8,13 @@ import socket
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from sqlalchemy import inspect as sqlalchemy_inspect
-from sqlalchemy import text
 
-from database import Base, engine
+from database import ensure_indexes
 from routers import analysis, auth, chat, contracts, extraction, upload, vehicle
 from routers import report as report_router
 
 # Configure app-wide logging so errors are visible in console and deployment logs.
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-
-
-# Create all SQLAlchemy tables on startup for quick local setup.
-# In production, use migrations (Alembic) for schema versioning.
-Base.metadata.create_all(bind=engine)
-
-# SQLite development databases can lag behind model changes.
-# This project uses `create_all()` (no migrations), so we do a minimal,
-# safe compatibility check to prevent runtime crashes.
-def _ensure_analysis_reports_columns() -> None:
-    # Only SQLite supports the PRAGMA + ALTER TABLE flow used here.
-    if getattr(engine.dialect, "name", "").lower() != "sqlite":
-        return
-    insp = sqlalchemy_inspect(engine)
-    if not insp.has_table("analysis_reports"):
-        return
-
-    # PRAGMA table_info returns: cid, name, type, notnull, dflt_value, pk
-    with engine.connect() as conn:
-        rows = conn.execute(text("PRAGMA table_info(analysis_reports)")).fetchall()
-    existing_columns = {row[1] for row in rows if len(row) > 1}
-
-    required = {
-        "user_id": "INTEGER",
-        "contract_text": "TEXT",
-        "pdf_path": "VARCHAR(512)",
-        "fairness_score": "FLOAT",
-    }
-
-    missing = [name for name in required.keys() if name not in existing_columns]
-    if not missing:
-        return
-
-    # SQLite: add missing columns without needing to rebuild the table.
-    with engine.begin() as conn:
-        for name in missing:
-            conn.execute(text(f"ALTER TABLE analysis_reports ADD COLUMN {name} {required[name]}"))
-
-
-_ensure_analysis_reports_columns()
 
 app = FastAPI(
     title="Contract Analysis Engine",
@@ -73,6 +30,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+ensure_indexes()
 
 
 @app.get("/")

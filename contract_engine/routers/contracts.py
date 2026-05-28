@@ -7,11 +7,8 @@ from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
 
 from database import get_db
-from database import ensure_analysis_reports_schema
-from models import AnalysisReport, ContractDocument, SLAExtraction
 from services.analysis_service import build_detailed_report
 
 router = APIRouter(tags=["Contracts"])
@@ -24,16 +21,16 @@ class CompareContractsRequest(BaseModel):
 
 
 def _serialize_contract(
-    document: ContractDocument,
-    sla_record: SLAExtraction | None,
-    analysis_record: AnalysisReport | None,
+    document: Dict[str, Any],
+    sla_record: Dict[str, Any] | None,
+    analysis_record: Dict[str, Any] | None,
 ) -> Dict[str, Any]:
     """Normalize a contract row into frontend-consumable shape."""
-    sla_json = sla_record.extracted_json if sla_record and isinstance(sla_record.extracted_json, dict) else None
+    sla_json = sla_record.get("extracted_json") if sla_record and isinstance(sla_record.get("extracted_json"), dict) else None
 
     analysis_json = (
-        analysis_record.report_json
-        if analysis_record and isinstance(analysis_record.report_json, dict)
+        analysis_record.get("report_json")
+        if analysis_record and isinstance(analysis_record.get("report_json"), dict)
         else None
     )
 
@@ -46,11 +43,13 @@ def _serialize_contract(
             negotiation_suggestions=[],
         )
 
+    uploaded_at = document.get("upload_timestamp")
+
     return {
-        "id": document.id,
-        "document_id": document.id,
-        "filename": document.filename,
-        "uploaded_at": document.upload_timestamp.isoformat() if isinstance(document.upload_timestamp, datetime) else None,
+        "id": document["id"],
+        "document_id": document["id"],
+        "filename": document["filename"],
+        "uploaded_at": uploaded_at.isoformat() if isinstance(uploaded_at, datetime) else None,
         "analyzed": bool(analysis_json or sla_json),
         "sla": sla_json,
         "analysis_report": analysis_json,
@@ -61,41 +60,22 @@ def _serialize_contract(
 
 
 @router.get("/contracts")
-def list_contracts(db: Session = Depends(get_db)) -> Dict[str, List[Dict[str, Any]]]:
+def list_contracts(db: Any = Depends(get_db)) -> Dict[str, List[Dict[str, Any]]]:
     """Return all uploaded contracts with optional SLA data for history views."""
-    # Repair SQLite schema if the table is missing recently-added columns.
-    ensure_analysis_reports_schema()
+    documents = list(db["contract_documents"].find().sort([("upload_timestamp", -1), ("id", -1)]))
 
-    documents = (
-        db.query(ContractDocument)
-        .order_by(ContractDocument.upload_timestamp.desc(), ContractDocument.id.desc())
-        .all()
-    )
-
-    contract_ids = [doc.id for doc in documents]
-    sla_rows = (
-        db.query(SLAExtraction)
-        .filter(SLAExtraction.document_id.in_(contract_ids))
-        .all()
-        if contract_ids
-        else []
-    )
-    analysis_rows = (
-        db.query(AnalysisReport)
-        .filter(AnalysisReport.document_id.in_(contract_ids))
-        .all()
-        if contract_ids
-        else []
-    )
-    sla_by_document_id = {row.document_id: row for row in sla_rows}
-    analysis_by_document_id = {row.document_id: row for row in analysis_rows}
+    contract_ids = [doc["id"] for doc in documents]
+    sla_rows = list(db["sla_extractions"].find({"document_id": {"$in": contract_ids}})) if contract_ids else []
+    analysis_rows = list(db["analysis_reports"].find({"document_id": {"$in": contract_ids}})) if contract_ids else []
+    sla_by_document_id = {row["document_id"]: row for row in sla_rows}
+    analysis_by_document_id = {row["document_id"]: row for row in analysis_rows}
 
     return {
         "contracts": [
             _serialize_contract(
                 doc,
-                sla_by_document_id.get(doc.id),
-                analysis_by_document_id.get(doc.id),
+                sla_by_document_id.get(doc["id"]),
+                analysis_by_document_id.get(doc["id"]),
             )
             for doc in documents
         ]
@@ -103,34 +83,33 @@ def list_contracts(db: Session = Depends(get_db)) -> Dict[str, List[Dict[str, An
 
 
 @router.get("/contracts/{document_id}")
-def get_contract(document_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
+def get_contract(document_id: int, db: Any = Depends(get_db)) -> Dict[str, Any]:
     """Return one contract with SLA details if available."""
-    document = db.query(ContractDocument).filter(ContractDocument.id == document_id).first()
+    document = db["contract_documents"].find_one({"id": document_id})
     if not document:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contract not found.")
 
-    sla_record = db.query(SLAExtraction).filter(SLAExtraction.document_id == document_id).first()
-    analysis_record = db.query(AnalysisReport).filter(AnalysisReport.document_id == document_id).first()
+    sla_record = db["sla_extractions"].find_one({"document_id": document_id})
+    analysis_record = db["analysis_reports"].find_one({"document_id": document_id})
     return _serialize_contract(document, sla_record, analysis_record)
 
 
 @router.delete("/contracts/{document_id}")
-def delete_contract(document_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
+def delete_contract(document_id: int, db: Any = Depends(get_db)) -> Dict[str, Any]:
     """Delete contract and linked SLA extraction data."""
-    document = db.query(ContractDocument).filter(ContractDocument.id == document_id).first()
+    document = db["contract_documents"].find_one({"id": document_id})
     if not document:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contract not found.")
 
-    db.query(AnalysisReport).filter(AnalysisReport.document_id == document_id).delete()
-    db.query(SLAExtraction).filter(SLAExtraction.document_id == document_id).delete()
-    db.delete(document)
-    db.commit()
+    db["analysis_reports"].delete_many({"document_id": document_id})
+    db["sla_extractions"].delete_many({"document_id": document_id})
+    db["contract_documents"].delete_many({"id": document_id})
 
     return {"deleted": True, "document_id": document_id}
 
 
 @router.post("/compare")
-def compare_contracts(body: CompareContractsRequest, db: Session = Depends(get_db)) -> Dict[str, Any]:
+def compare_contracts(body: CompareContractsRequest, db: Any = Depends(get_db)) -> Dict[str, Any]:
     """Compare multiple contracts and rank by score with good/mid/bad categories."""
     if len(body.contract_ids) > 6:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="A maximum of 6 contracts can be compared.")
@@ -139,8 +118,8 @@ def compare_contracts(body: CompareContractsRequest, db: Session = Depends(get_d
     if len(ids) < 2:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="At least 2 unique contracts are required.")
 
-    documents = db.query(ContractDocument).filter(ContractDocument.id.in_(ids)).all()
-    docs_by_id = {doc.id: doc for doc in documents}
+    documents = list(db["contract_documents"].find({"id": {"$in": ids}}))
+    docs_by_id = {doc["id"]: doc for doc in documents}
 
     missing_ids = [doc_id for doc_id in ids if doc_id not in docs_by_id]
     if missing_ids:
@@ -149,17 +128,17 @@ def compare_contracts(body: CompareContractsRequest, db: Session = Depends(get_d
             detail=f"Contract(s) not found: {missing_ids}",
         )
 
-    sla_rows = db.query(SLAExtraction).filter(SLAExtraction.document_id.in_(ids)).all()
-    analysis_rows = db.query(AnalysisReport).filter(AnalysisReport.document_id.in_(ids)).all()
-    sla_by_document_id = {row.document_id: row for row in sla_rows if isinstance(row.extracted_json, dict)}
-    analysis_by_document_id = {row.document_id: row for row in analysis_rows if isinstance(row.report_json, dict)}
+    sla_rows = list(db["sla_extractions"].find({"document_id": {"$in": ids}}))
+    analysis_rows = list(db["analysis_reports"].find({"document_id": {"$in": ids}}))
+    sla_by_document_id = {row["document_id"]: row for row in sla_rows if isinstance(row.get("extracted_json"), dict)}
+    analysis_by_document_id = {row["document_id"]: row for row in analysis_rows if isinstance(row.get("report_json"), dict)}
 
     deals: List[Dict[str, Any]] = []
     for doc_id in ids:
         document = docs_by_id[doc_id]
-        sla_json = sla_by_document_id.get(doc_id).extracted_json if doc_id in sla_by_document_id else {}
+        sla_json = sla_by_document_id.get(doc_id).get("extracted_json") if doc_id in sla_by_document_id else {}
         report = analysis_by_document_id.get(doc_id)
-        report_json = report.report_json if report else None
+        report_json = report.get("report_json") if report else None
         if not isinstance(report_json, dict):
             report_json = build_detailed_report(
                 sla_data=sla_json,
@@ -171,7 +150,7 @@ def compare_contracts(body: CompareContractsRequest, db: Session = Depends(get_d
         deals.append(
             {
                 "document_id": doc_id,
-                "filename": document.filename,
+                "filename": document["filename"],
                 "score": report_json.get("deal_score") or report_json.get("overall_score"),
                 "category": report_json.get("deal_category"),
                 "sla": sla_json,

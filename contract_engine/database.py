@@ -1,76 +1,96 @@
 """Database configuration module for the Contract Analysis Engine."""
 
+from __future__ import annotations
+
 import os
+from pathlib import Path
+from typing import Generator
 
-from dotenv import load_dotenv
-from sqlalchemy import create_engine
-from sqlalchemy import inspect as sqlalchemy_inspect
-from sqlalchemy import text
-from sqlalchemy.orm import declarative_base, sessionmaker
+from pymongo import MongoClient, ReturnDocument
+from pymongo.database import Database
+from pymongo.errors import ConfigurationError
 
-# Load environment variables from a local .env file.
-load_dotenv()
+try:
+    from dotenv import load_dotenv as _load_dotenv
+except ModuleNotFoundError:
+    def _load_dotenv() -> bool:
+        """Fallback .env loader used when python-dotenv is unavailable."""
+        env_path = Path(__file__).resolve().parent / ".env"
+        if not env_path.exists():
+            return False
 
-# SQLite is used by default to keep local setup simple for beginners.
-# You can set PostgreSQL in .env with:
-# DATABASE_URL=postgresql+psycopg2://username:password@localhost:5432/contract_engine
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./contract_engine.db")
+        for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
 
-# The engine is the core SQLAlchemy interface to the database.
-# `check_same_thread=False` is required only when using SQLite with FastAPI.
-if DATABASE_URL.startswith("sqlite"):
-    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-else:
-    engine = create_engine(DATABASE_URL)
+            key, value = line.split("=", 1)
+            os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
-# SessionLocal creates independent database sessions for each request.
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Base is inherited by SQLAlchemy models.
-Base = declarative_base()
+        return True
 
 
-def get_db():
-    """Yield a database session for each request and ensure cleanup."""
-    db = SessionLocal()
+# Load environment variables from a local .env file when available.
+_load_dotenv()
+
+
+def normalize_mongodb_uri(database_url: str) -> str:
+    """Normalize legacy MongoDB URLs into a consistent URI shape."""
+    if database_url.startswith(("mongodb://", "mongodb+srv://")):
+        return database_url
+    if database_url.startswith("mongo://"):
+        return database_url.replace("mongo://", "mongodb://", 1)
+    return database_url
+
+
+# Prefer MONGODB_URI, but keep DATABASE_URL as a compatibility fallback.
+MONGODB_URI = normalize_mongodb_uri(
+    os.getenv("MONGODB_URI")
+    or os.getenv("DATABASE_URL")
+    or "mongodb://localhost:27017/contract_engine"
+)
+MONGODB_DB_NAME = os.getenv("MONGODB_DB_NAME")
+
+
+client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=5000, tz_aware=False)
+
+
+def get_database() -> Database:
+    """Return the configured MongoDB database."""
+    if MONGODB_DB_NAME:
+        return client[MONGODB_DB_NAME]
+
     try:
-        # Provide the session to route handlers.
-        yield db
-    finally:
-        # Always close the session to release DB resources.
-        db.close()
+        return client.get_default_database()
+    except ConfigurationError:
+        return client["contract_engine"]
 
 
-# SQLite development can easily end up with a stale schema when the app evolves.
-# This app uses `Base.metadata.create_all()` without migrations, so we ensure
-# analysis-related columns exist before endpoints query the table.
-def ensure_analysis_reports_schema() -> None:
-    """Best-effort schema compatibility for `analysis_reports` on SQLite."""
-    # Only SQLite supports the PRAGMA + ALTER TABLE flow used here.
-    if getattr(engine.dialect, "name", "").lower() != "sqlite":
-        return
+def get_db() -> Generator[Database, None, None]:
+    """Yield a MongoDB database handle for request-scoped dependencies."""
+    yield get_database()
 
-    # Fast path: if table doesn't exist yet, `create_all()` will handle it.
-    insp = sqlalchemy_inspect(engine)
-    if not insp.has_table("analysis_reports"):
-        return
 
-    with engine.connect() as conn:
-        rows = conn.execute(text("PRAGMA table_info(analysis_reports)")).fetchall()
+def get_next_sequence(db: Database, name: str) -> int:
+    """Return the next integer sequence value for a named collection."""
+    result = db["counters"].find_one_and_update(
+        {"_id": name},
+        {"$inc": {"seq": 1}, "$setOnInsert": {"seq": 0}},
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
+    )
+    return int(result["seq"])
 
-    existing_columns = {row[1] for row in rows if len(row) > 1}
 
-    required = {
-        "user_id": "INTEGER",
-        "contract_text": "TEXT",
-        "pdf_path": "VARCHAR(512)",
-        "fairness_score": "FLOAT",
-    }
+def ensure_indexes(db: Database | None = None) -> None:
+    """Create the MongoDB indexes used by the API."""
+    database = db or get_database()
 
-    missing = [name for name in required.keys() if name not in existing_columns]
-    if not missing:
-        return
+    database["contract_documents"].create_index([("id", 1)], unique=True)
+    database["contract_documents"].create_index([("upload_timestamp", -1), ("id", -1)])
 
-    with engine.begin() as conn:
-        for name in missing:
-            conn.execute(text(f"ALTER TABLE analysis_reports ADD COLUMN {name} {required[name]}"))
+    database["sla_extractions"].create_index([("document_id", 1)], unique=True)
+    database["analysis_reports"].create_index([("document_id", 1)], unique=True)
+    database["user_accounts"].create_index([("id", 1)], unique=True)
+    database["user_accounts"].create_index([("email", 1)], unique=True)
+    database["counters"].create_index([("_id", 1)], unique=True)

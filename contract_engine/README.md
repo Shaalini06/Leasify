@@ -26,7 +26,14 @@ pip install -r requirements.txt
 - Edit `.env` and set at least:
   - `OPENROUTER_API_KEY=YOUR_REAL_KEY`
   - `OPENROUTER_VISION_MODEL=openai/gpt-4o-mini` (optional override for OCR model)
-  - `DATABASE_URL=sqlite:///./contract_engine.db` (or PostgreSQL URL)
+  - `MONGODB_URI=mongodb+srv://USER:PASSWORD@HOST/contract_engine?retryWrites=true&w=majority`
+  - `MONGODB_DB_NAME=contract_engine` if your URI does not include a database name
+
+  To move existing SQLite data into MongoDB, run:
+
+  ```powershell
+  python scripts/migrate_sqlite_to_cloud.py --source-url sqlite:///./contract_engine.db --target-url $env:MONGODB_URI --replace-existing
+  ```
 
 You can copy `.env.example` to `.env` if you want a clean template first.
 
