@@ -18,5 +18,8 @@
   "bugs": {
     "url": "https://github.com/springboardmentor112r-Agri/AI_CarAssistant/issues"
   },
-  "homepage": "https://github.com/springboardmentor112r-Agri/AI_CarAssistant#readme"
+  "homepage": "https://github.com/springboardmentor112r-Agri/AI_CarAssistant#readme",
+  "devDependencies": {
+    "vite": "^8.0.14"
+  }
 }
